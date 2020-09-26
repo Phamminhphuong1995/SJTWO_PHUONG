@@ -174,9 +174,10 @@ void spi_task(void *p) {
 
 void task_write_page(void *p) {
   while (1) {
-    write_page(0x0000FE, 0x75);
+    write_page(0x0000FC, 0x75);
+    vTaskDelay(1);
     printf("data at 0x00: %x\n", read_byte(0x0000FE));
-    printf("data at 0x00: %x\n", read_byte(0x0000FF));
+    printf("data at 0x00: %x\n", read_byte(0x0000FC));
     vTaskDelay(100);
   }
 }

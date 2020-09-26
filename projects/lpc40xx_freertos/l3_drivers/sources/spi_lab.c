@@ -64,8 +64,8 @@ void write_enable() {
   ds();
 }
 void ds() {
-  // GPIO__set_as_output(1, 10);
-  // GPIO__set_as_output(0, 8);
+  GPIO__set_as_output(1, 10);
+  GPIO__set_as_output(0, 8);
   GPIO__set_high(1, 10);
   GPIO__set_high(0, 8);
 }
@@ -81,9 +81,9 @@ uint8_t read_byte(uint32_t address) {
   cs();
   ssp2__exchange_byte_lab(0x0B);      // Read OP Code
   adesto_flash_send_address(address); // Specific add
-  // (void)ssp2__exchange_byte_lab(0xFF);
-  // (void)ssp2__exchange_byte_lab(0xFF);
-  // (void)ssp2__exchange_byte_lab(0xFF);
+                                      // (void)ssp2__exchange_byte_lab(0xFF);
+                                      // (void)ssp2__exchange_byte_lab(0xFF);
+  (void)ssp2__exchange_byte_lab(0xFF);
   result = ssp2__exchange_byte_lab(0xFF);
   ds();
   return result;
