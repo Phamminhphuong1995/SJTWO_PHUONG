@@ -55,7 +55,6 @@ static void adesto_ds(void) {
   gpio__construct_as_output(1, 10);
   gpio__construct_as_output(0, 8);
   GPIO__set_high(1, 10);
-
   GPIO__set_high(0, 8);
 }
 
@@ -174,10 +173,13 @@ void spi_task(void *p) {
 
 void task_write_page(void *p) {
   while (1) {
-    write_page(0x0000FC, 0x75);
-    vTaskDelay(1);
-    printf("data at 0x00: %x\n", read_byte(0x0000FE));
-    printf("data at 0x00: %x\n", read_byte(0x0000FC));
-    vTaskDelay(100);
+    // write_page(0x000207, 0xFF);
+    write_page(0x0000FF, 0xFF);
+    // erase_page(0x000000);
+    printf("data at 0x00: %x\n", read_byte(0x0000FF));
+    // printf("data at 0x00: %x\n", read_byte(0x0000FE));
+    // printf("data at 0x00: %x\n", read_byte(0x0000FD));
+    // (void)check_status_reg();
+    vTaskDelay(1000);
   }
 }
