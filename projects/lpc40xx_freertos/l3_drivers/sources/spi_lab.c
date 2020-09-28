@@ -49,6 +49,30 @@ void adesto_flash_send_address(uint32_t address) {
 void write_page(uint32_t address, uint8_t data) {
   // enable "write_enable"
   write_enable();
+  cs();
+  {
+    ssp2__exchange_byte_lab(0x02);
+    adesto_flash_send_address(address);
+    ssp2__exchange_byte_lab(data);
+    //   for (int i = 0; i <= 255; i++) {
+    //     ssp2__exchange_byte_lab(data);
+    //     data++;
+    //   }
+    // }
+    write_disable();
+    ds();
+  }
+}
+uint8_t read_byte(uint32_t address) {
+  uint8_t result;
+  cs();
+  ssp2__exchange_byte_lab(0x03);      // Read OP Code
+  adesto_flash_send_address(address); // Specific add
+  result = ssp2__exchange_byte_lab(0xFF);
+  ds();
+  return result;
+}
+void erase_page(uint8_t address) {
   // unblock the memory
   // cs();
   // {
@@ -56,17 +80,27 @@ void write_page(uint32_t address, uint8_t data) {
   //   ssp2__exchange_byte_lab(0x00);
   // }
   // ds();
+  // cs();
+  write_enable();
+  // ds();
   cs();
-  {
-    ssp2__exchange_byte_lab(0x02);
-    // sending address
-    adesto_flash_send_address(address);
-    ssp2__exchange_byte_lab(data);
-  }
+  ssp2__exchange_byte_lab(0x81);
+  ssp2__exchange_byte_lab(0xFF);
+  ssp2__exchange_byte_lab(address);
+  ssp2__exchange_byte_lab(0xFF);
   ds();
-  write_disable();
+  // write_disable();
+}
+uint8_t check_status_reg() {
+  cs();
+  ssp2__exchange_byte_lab(0x05);
+  uint8_t byte1 = ssp2__exchange_byte_lab(0xFF);
+  uint8_t byte2 = ssp2__exchange_byte_lab(0xFF);
+  printf("%x\n", byte1);
+  printf("%x\n", byte2);
   ds();
 }
+
 void write_enable() {
   cs();
   ssp2__exchange_byte_lab(0x06);
@@ -77,6 +111,7 @@ void write_disable() {
   ssp2__exchange_byte_lab(0x04);
   ds();
 }
+
 void ds() {
   GPIO__set_as_output(1, 10);
   GPIO__set_as_output(0, 8);
@@ -88,38 +123,4 @@ void cs() {
   GPIO__set_as_output(0, 8);
   GPIO__set_low(1, 10);
   GPIO__set_low(0, 8);
-}
-
-uint8_t read_byte(uint32_t address) {
-  uint8_t result;
-  cs();
-  ssp2__exchange_byte_lab(0x03);      // Read OP Code
-  adesto_flash_send_address(address); // Specific add
-  result = ssp2__exchange_byte_lab(0xFF);
-  ds();
-  return result;
-}
-void erase_page(uint32_t address) {
-  // unblock the memory
-  // cs();
-  // {
-  //   ssp2__exchange_byte_lab(0x01);
-  //   ssp2__exchange_byte_lab(0x00);
-  // }
-  // ds();
-  cs();
-  ssp2__exchange_byte_lab(0x81);
-  ssp2__exchange_byte_lab(0xFF);
-  ssp2__exchange_byte_lab(0x00);
-  ssp2__exchange_byte_lab(0xFF);
-  ds();
-}
-uint8_t check_status_reg() {
-  cs();
-  ssp2__exchange_byte_lab(0x05);
-  uint8_t byte1 = ssp2__exchange_byte_lab(0xFF);
-  uint8_t byte2 = ssp2__exchange_byte_lab(0xFF);
-  printf("%x\n", byte1);
-  printf("%x\n", byte2);
-  ds();
 }

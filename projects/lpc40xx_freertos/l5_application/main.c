@@ -173,13 +173,34 @@ void spi_task(void *p) {
 
 void task_write_page(void *p) {
   while (1) {
-    // write_page(0x000207, 0xFF);
-    write_page(0x0000FF, 0xFF);
-    // erase_page(0x000000);
-    printf("data at 0x00: %x\n", read_byte(0x0000FF));
-    // printf("data at 0x00: %x\n", read_byte(0x0000FE));
-    // printf("data at 0x00: %x\n", read_byte(0x0000FD));
+
+    printf("erasing page 1\n");
+    erase_page(0x01);
+    vTaskDelay(100);
+
+    printf("erasing page 2\n");
+    erase_page(0x02);
+    vTaskDelay(100);
+
+    printf("data at 0x207: %x\n", read_byte(0x000207));
+    printf("data at 0x1FF: %x\n", read_byte(0x0001FF));
+    vTaskDelay(100);
+
+    write_page(0x000207, 0xCC);
+    vTaskDelay(100);
+    write_page(0x0001FF, 0xEE);
+    vTaskDelay(100);
+    write_page(0x0000FD, 0xAA);
+    vTaskDelay(100);
+
+    printf("After printing data at 0x207: %x\n", read_byte(0x000207));
+    vTaskDelay(100);
+    printf("After printing data at 0x1FF: %x\n", read_byte(0x0001FF));
+    vTaskDelay(100);
+    printf("After printing data at 0x0FD: %x\n", read_byte(0x0000FD));
+    vTaskDelay(100);
     // (void)check_status_reg();
+
     vTaskDelay(1000);
   }
 }
