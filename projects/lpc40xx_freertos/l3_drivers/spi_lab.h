@@ -16,7 +16,7 @@ void write_page(uint32_t address, uint8_t data);
 void write_enable();
 void ds();
 void cs();
-uint8_t read_byte(uint32_t address);
+void read_byte(uint32_t address, uint8_t *result);
 void write_disable();
 void erase_page(uint8_t address);
 uint8_t check_status_reg();

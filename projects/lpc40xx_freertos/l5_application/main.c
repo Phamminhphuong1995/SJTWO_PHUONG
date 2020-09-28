@@ -173,34 +173,45 @@ void spi_task(void *p) {
 
 void task_write_page(void *p) {
   while (1) {
+    uint8_t temp[256];
+    // printf("erasing page 0\n");
+    // erase_page(0x00);
+    // vTaskDelay(100);
 
-    printf("erasing page 1\n");
-    erase_page(0x01);
-    vTaskDelay(100);
+    // printf("erasing page 1\n");
+    // erase_page(0x01);
+    // vTaskDelay(100);
 
     printf("erasing page 2\n");
-    erase_page(0x02);
-    vTaskDelay(100);
-
-    printf("data at 0x207: %x\n", read_byte(0x000207));
-    printf("data at 0x1FF: %x\n", read_byte(0x0001FF));
-    vTaskDelay(100);
-
-    write_page(0x000207, 0xCC);
-    vTaskDelay(100);
-    write_page(0x0001FF, 0xEE);
-    vTaskDelay(100);
-    write_page(0x0000FD, 0xAA);
-    vTaskDelay(100);
-
-    printf("After printing data at 0x207: %x\n", read_byte(0x000207));
-    vTaskDelay(100);
-    printf("After printing data at 0x1FF: %x\n", read_byte(0x0001FF));
-    vTaskDelay(100);
-    printf("After printing data at 0x0FD: %x\n", read_byte(0x0000FD));
-    vTaskDelay(100);
-    // (void)check_status_reg();
-
+    erase_page(0x00);
     vTaskDelay(1000);
+    read_byte(0x000000, temp);
+    for (int i = 0; i <= 255; i++) {
+      printf("data at %d is %x: \n", i, temp[i]);
+    }
+    // printf("data at 0x207: %x\n", read_byte(0x000207));
+    // printf("data at 0x1FF: %x\n", read_byte(0x0001FF));
+    vTaskDelay(1000);
+
+    write_page(0x000000, 0x00);
+    vTaskDelay(2500);
+    // write_page(0x0001FF, 0xFF);
+    // vTaskDelay(1000);
+    // write_page(0x0000FD, 0x7F);
+    // vTaskDelay(1000);
+    printf("\n\n");
+    read_byte(0x000000, temp);
+    for (int i = 0; i <= 255; i++) {
+      printf("data at %d is: %x \n", i, temp[i]);
+    }
+    // printf("After printing data at 0x207: %02x\n", read_byte(0x000207));
+    // vTaskDelay(100);
+    // printf("After printing data at 0x1FF: %02x\n", read_byte(0x0001FF));
+    // vTaskDelay(100);
+    // printf("After printing data at 0x0FD: %02x\n", read_byte(0x0000FD));
+    // vTaskDelay(100);
+    // // (void)check_status_reg();
+
+    vTaskDelay(2000);
   }
 }

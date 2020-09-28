@@ -53,24 +53,22 @@ void write_page(uint32_t address, uint8_t data) {
   {
     ssp2__exchange_byte_lab(0x02);
     adesto_flash_send_address(address);
-    ssp2__exchange_byte_lab(data);
-    //   for (int i = 0; i <= 255; i++) {
-    //     ssp2__exchange_byte_lab(data);
-    //     data++;
-    //   }
-    // }
+    for (int i = 0; i <= 255; i++) {
+      ssp2__exchange_byte_lab(data);
+      data++;
+    }
     write_disable();
     ds();
   }
 }
-uint8_t read_byte(uint32_t address) {
-  uint8_t result;
+void read_byte(uint32_t address, uint8_t *result) {
   cs();
   ssp2__exchange_byte_lab(0x03);      // Read OP Code
   adesto_flash_send_address(address); // Specific add
-  result = ssp2__exchange_byte_lab(0xFF);
+  for (int i = 0; i <= 255; i++) {
+    result[i] = ssp2__exchange_byte_lab(0xFF);
+  }
   ds();
-  return result;
 }
 void erase_page(uint8_t address) {
   // unblock the memory
