@@ -13,10 +13,13 @@ uint8_t ssp2__exchange_byte_lab(uint8_t data_out);
  */
 void adesto_flash_send_address(uint32_t address);
 void write_page(uint32_t address, uint8_t data);
+void write_byte(uint32_t address, uint8_t data);
 void write_enable();
 void ds();
 void cs();
-void read_byte(uint32_t address, uint8_t *result);
+void read_page(uint32_t address, uint8_t *result);
+uint8_t read_byte(uint32_t address, uint8_t result);
 void write_disable();
 void erase_page(uint8_t address);
 uint8_t check_status_reg();
+void unblock_mem(void);

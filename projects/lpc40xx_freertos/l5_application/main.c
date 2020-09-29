@@ -89,8 +89,8 @@ adesto_flash_id_s ssp2__adesto_read_signature(void) {
  */
 void spi_id_verification_task(void *p);
 
-const int a = 5;
-const int b = 9;
+const int a = 1;
+const int b = 2;
 int main(void) {
   // part_0_1();
   // part_2b();
@@ -130,7 +130,7 @@ void spi_id_verification_task(void *p) {
 
   while (1) {
     if (xSemaphoreTake(spi_bus_mutex, 1000)) {
-      printf("%d\n", *(foo));
+      printf("this is task %d\n", *(foo));
       const adesto_flash_id_s id = ssp2__adesto_read_signature();
       // When we read a manufacturer ID we do not expect, we will kill this task
       if (id.manufacturer_id != 0x1F) {
@@ -185,24 +185,25 @@ void task_write_page(void *p) {
     printf("erasing page 2\n");
     erase_page(0x00);
     vTaskDelay(1000);
-    read_byte(0x000000, temp);
+    read_page(0x000000, temp);
     for (int i = 0; i <= 255; i++) {
-      printf("data at %d is %x: \n", i, temp[i]);
+      printf("data at %d after erasing is: %x\n", i, temp[i]);
     }
     // printf("data at 0x207: %x\n", read_byte(0x000207));
     // printf("data at 0x1FF: %x\n", read_byte(0x0001FF));
     vTaskDelay(1000);
-
     write_page(0x000000, 0x00);
     vTaskDelay(2500);
+    // write_byte(0x000000, 0x01);
+    // vTaskDelay(500);
     // write_page(0x0001FF, 0xFF);
     // vTaskDelay(1000);
     // write_page(0x0000FD, 0x7F);
     // vTaskDelay(1000);
     printf("\n\n");
-    read_byte(0x000000, temp);
+    read_page(0x000000, temp);
     for (int i = 0; i <= 255; i++) {
-      printf("data at %d is: %x \n", i, temp[i]);
+      printf("data at %d after writing is: %x \n", i, temp[i]);
     }
     // printf("After printing data at 0x207: %02x\n", read_byte(0x000207));
     // vTaskDelay(100);
