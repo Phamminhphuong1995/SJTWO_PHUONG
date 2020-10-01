@@ -1,6 +1,13 @@
 #include "gpio_lab.h"
 #include <stdint.h>
 #include <stdio.h>
+
+typedef enum {
+  PAGE_NUMBER_0 = 0,
+  PAGE_NUMBER_1,
+  PAGE_NUMBER_2,
+} page_number;
+
 void ssp2__init_lab(uint32_t max_clock_mhz);
 
 uint8_t ssp2__exchange_byte_lab(uint8_t data_out);
