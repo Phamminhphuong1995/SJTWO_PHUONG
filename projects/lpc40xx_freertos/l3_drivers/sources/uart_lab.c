@@ -2,6 +2,7 @@
 #include "lpc40xx.h"
 
 #include <stdio.h>
+
 void uart_lab__init(uart_number_e uart, uint32_t peripheral_clock, uint32_t baud_rate) {
   // Refer to LPC User manual and setup the register bits correctly
   // The first page of the UART chapter has good instructions
@@ -16,8 +17,7 @@ void uart_lab__init(uart_number_e uart, uint32_t peripheral_clock, uint32_t baud
     // Set up data length 8bit 11
     LPC_UART3->LCR |= (3 << 0);
     // Set up DLL
-    uint16_t divider = (uint16_t)peripheral_clock / (16 * baud_rate); // ??? Copy from Kang. NO IDEA HOW IT WORKS
-    // Example:
+    uint16_t divider = (uint16_t)peripheral_clock / (16 * baud_rate);
     // divider = 15 = 0x 0000 0000 1111 1111
     // DLM = 0x00 and DLL  = 0xFF
     LPC_UART3->DLM = (divider >> 8) & 0xFF; // register is 8 bit. The most significant bit to DLL
