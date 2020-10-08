@@ -41,10 +41,11 @@ int counter_1 = 0;
 /* -------------------------------------------------------------------------- */
 
 void main(void) {
-  // puts("running part1\n");
+  // puts("\nrunning part1\n\n");
   // part0_1();
-  // puts("running part 2\n");
+  // puts("\nrunning part 2\n");
   // part2();
+  puts("\nrunning part 3\n");
   part3();
 }
 
@@ -117,7 +118,7 @@ void part0_1() {
   uart_lab__init(UART_3, 96000000, 38400);
   configure_uart3_pin();
 
-  xTaskCreate(uart_read_task, "read", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(uart_read_task, "read", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
   xTaskCreate(uart_write_task, "write", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
 
   vTaskStartScheduler();
@@ -231,7 +232,7 @@ void uart_read_task(void *p) {
     // printf("crash at get\n");
     uart_lab__polled_get(UART_3, &input);
     printf("%c", input);
-    vTaskDelay(50);
+    vTaskDelay(500);
   }
 }
 
