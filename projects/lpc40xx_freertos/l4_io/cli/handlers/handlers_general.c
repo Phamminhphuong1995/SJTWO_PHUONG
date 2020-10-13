@@ -1,9 +1,62 @@
-#include "cli_handlers.h"
-
 #include "FreeRTOS.h"
+#include "cli_handlers.h"
+#include "sl_string.h"
 #include "task.h"
-
+#include <stdio.h>
 static void cli__task_list_print(sl_string_t user_input_minus_command_name, app_cli__print_string_function cli_output);
+
+/* --------------------------------- PHUONG --------------------------------- */
+
+// TODO: Add your CLI handler function definition to 'handlers_general.c' (You can also create a new *.c file)
+app_cli_status_e cli__phuong_handler(app_cli__argument_t argument, sl_string_t user_input_minus_command_name,
+                                     app_cli__print_string_function cli_output) {
+
+  sl_string_t s = user_input_minus_command_name;
+
+  // If the user types 'taskcontrol suspend led0' then we need to suspend a task with the name of 'led0'
+  // In this case, the user_input_minus_command_name will be set to 'suspend led0' with the command-name removed
+  if (sl_string__begins_with_ignore_case(s, "suspend")) {
+    // TODO: Use sl_string API to remove the first word, such that variable 's' will equal to 'led0'
+    // OR
+    // TODO: Or you can do this: char name[16]; sl_string__scanf("%*s %16s", name);
+    (void)sl_string__erase_first_word(s, ' ');
+    TaskHandle_t task_handle = xTaskGetHandle(s);
+
+    if (NULL == task_handle) {
+      // note: we cannot use 'sl_string__printf("Failed to find %s", s);' because that would print existing string onto
+      // itself
+      sl_string__insert_at(s, 0, "Could not find a task to suspend with name: ");
+      cli_output(NULL, s);
+      printf("\n");
+    } else {
+      vTaskSuspend(task_handle);
+      printf("Suspended the task: ");
+      cli_output(NULL, s);
+      printf("\n");
+    }
+
+  } else if (sl_string__begins_with_ignore_case(s, "resume")) {
+    (void)sl_string__erase_first_word(s, ' ');
+    TaskHandle_t task_handle = xTaskGetHandle(s);
+
+    if (NULL == task_handle) {
+      sl_string__insert_at(s, 0, "Could not find a task to resume with name: ");
+      cli_output(NULL, s);
+      printf("\n");
+    } else {
+      vTaskResume(task_handle);
+      printf("Resumed the task: ");
+      cli_output(NULL, s);
+      printf("\n");
+    }
+  } else {
+    cli_output(NULL, "Did you mean to say suspend or resume?\n");
+  }
+
+  return APP_CLI_STATUS__SUCCESS;
+}
+
+/* ----------------------------------- END ---------------------------------- */
 
 app_cli_status_e cli__crash_me(app_cli__argument_t argument, sl_string_t user_input_minus_command_name,
                                app_cli__print_string_function cli_output) {

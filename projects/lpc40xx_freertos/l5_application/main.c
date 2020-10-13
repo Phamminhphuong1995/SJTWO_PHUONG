@@ -1,308 +1,111 @@
 #include "FreeRTOS.h"
+#include "board_io.h"
+#include "cli_handlers.h"
 #include "clock.h"
 #include "gpio.h"
 #include "gpio_lab.h"
+#include "periodic_scheduler.h"
 #include "queue.h"
+#include "sj2_cli.h"
 #include "task.h"
 #include "uart_lab.h"
 #include <stdio.h>
 #include <string.h>
+static void create_uart_task(void);
+static void uart_task(void *params);
 
-/* -------------------------------------------------------------------------- */
-/*                       DECLARATION AND GLOBAL VARIABLE                      */
-/* -------------------------------------------------------------------------- */
+static QueueHandle_t switch_queue;
 
-/* ------------------------------- MAIN PART 3 ------------------------------ */
+typedef enum { switch__off, switch__on } switch_e;
 
-void part3();
-void board_1_sender_task(void *p);
-void board_2_receiver_task(void *p);
-void configure_uart2_3_forLOOPBACK_pin();
+get_switch_input_from_switch0() {
+  gpio__construct_with_function(0, 30, GPIO__FUNCITON_0_IO_PIN);
+  GPIO__set_as_input(0, 30);
+  return GPIO__get_level(0, 30);
+}
 
-/* ------------------------------- MAIN PART 2 ------------------------------ */
+// TODO: Create this task at PRIORITY_LOW
+void producer(void *p) {
+  while (1) {
+    const switch_e switch_value = get_switch_input_from_switch0();
+    printf("P_BEFORE\n");
+    if (xQueueSend(switch_queue, &switch_value, 0)) {
+      printf("P_AFTER\n");
+    }
+    vTaskDelay(1000);
+  }
+}
 
-void part2();
-void configure_uart2_pin();
-void uart_read_task_fromISR(void *p);
+// TODO: Create this task at PRIORITY_HIGH
+void consumer(void *p) {
+  switch_e switch_value;
+  while (1) {
+    printf("C_BEFORE\n");
+    if (xQueueReceive(switch_queue, &switch_value, portMAX_DELAY)) {
+      printf("C_AFTER\n");
+    }
+  }
+}
+void blinkTask(void) {
+  GPIO__set_as_output(1, 18);
+  while (1) {
+    GPIO__set_high(1, 18);
+    vTaskDelay(500);
+    GPIO__set_low(1, 18);
+    vTaskDelay(500);
+  }
+}
+void P_Low_C_High(void) {
+  xTaskCreate(producer, "Producer", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(consumer, "Consumer", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+  // xTaskCreate(blinkTask, "led", 2048 / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  // sj2_cli__init();
 
-/* ------------------------------- MAIN PART 1 ------------------------------ */
+  // // // TODO Queue handle is not valid until you create it
+  switch_queue =
+      xQueueCreate(1, sizeof(switch_e)); // Choose depth of item being our enum (1 should be okay for this example)
+  vTaskStartScheduler();
+}
+void P_High_C_Low(void) {
+  xTaskCreate(producer, "Producer", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+  xTaskCreate(consumer, "Consumer", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  // xTaskCreate(blinkTask, "led", 2048 / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  // sj2_cli__init();
 
-void part0_1();
-void configure_uart3_pin();
-void uart_write_task(void *p);
-void uart_read_task(void *p);
+  // // // TODO Queue handle is not valid until you create it
+  switch_queue =
+      xQueueCreate(1, sizeof(switch_e)); // Choose depth of item being our enum (1 should be okay for this example)
+  vTaskStartScheduler();
+}
 
-/* ----------------------------- GLOBAL VARIABLE ---------------------------- */
+void P_C_Same_Priority(void) {
+  xTaskCreate(consumer, "Consumer", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(producer, "Producer", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  // xTaskCreate(blinkTask, "led", 2048 / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  // sj2_cli__init();
 
-int counter_1 = 0;
+  // // // TODO Queue handle is not valid until you create it
+  switch_queue =
+      xQueueCreate(1, sizeof(switch_e)); // Choose depth of item being our enum (1 should be okay for this example)
+  vTaskStartScheduler();
+}
 
-/* -------------------------------------------------------------------------- */
-/*                                    MAIN                                    */
-/* -------------------------------------------------------------------------- */
-
+void extra_credit_cli_handler(void) {
+  sj2_cli__init();
+  xTaskCreate(blinkTask, "led", 2048 / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  // create_uart_task();
+  xTaskCreate(consumer, "Consumer", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  xTaskCreate(producer, "Producer", 2048 / sizeof(void *), NULL, PRIORITY_LOW, NULL);
+  switch_queue =
+      xQueueCreate(1, sizeof(switch_e)); // Choose depth of item being our enum (1 should be okay for this example)
+  vTaskStartScheduler();
+}
 void main(void) {
-  // puts("\nrunning part1\n\n");
-  // part0_1();
-  // puts("\nrunning part 2\n");
-  // part2();
-  puts("\nrunning part 3\n");
-  part3();
-}
 
-/* -------------------------------------------------------------------------- */
-/*                   Private queue handle of our uart_lab.c                 */
-/* -------------------------------------------------------------------------- */
+  // P_Low_C_High();
 
-static QueueHandle_t your_uart_rx_queue;
-static void your_receive_interrupt_UART3(void);
-static void your_receive_interrupt_UART2(void);
-void uart__enable_receive_interrupt(uart_number_e uart_number);
-bool uart_lab__get_char_from_queue(char *input_byte, uint32_t timeout);
+  // P_High_C_Low();
 
-/* -------------------------------------------------------------------------- */
-/*                         CONFIGURE FUNCTION FOR UART                        */
-/* -------------------------------------------------------------------------- */
-
-void configure_uart3_pin() {
-  gpio__construct_with_function(4, 28, GPIO__FUNCTION_2);
-  gpio__construct_with_function(4, 29, GPIO__FUNCTION_2);
-}
-void configure_uart2_pin() {
-  gpio__construct_with_function(2, 8, GPIO__FUNCTION_2);
-  gpio__construct_with_function(2, 9, GPIO__FUNCTION_2);
-}
-/**
- * Configure UART 2 as RECEIVE
- * Configure UART 3 as TRANSMIT
- * */
-void configure_uart2_3_forLOOPBACK_pin() {
-  gpio__construct_with_function(4, 28, GPIO__FUNCTION_2); // SEND
-  gpio__construct_with_function(2, 9, GPIO__FUNCTION_2);  // RECEIVE
-}
-/* -------------------------------------------------------------------------- */
-/*                              MAIN SUB FUNCTION                             */
-/* -------------------------------------------------------------------------- */
-
-/* --------------------------------- PART 3 --------------------------------- */
-
-void part3() {
-  uart_lab__init(UART_3, 96000000, 38400);
-  uart_lab__init(UART_2, 96000000, 38400);
-  configure_uart2_3_forLOOPBACK_pin();
-  // uart__enable_receive_interrupt(UART_3);
-  uart__enable_receive_interrupt(UART_2);
-
-  xTaskCreate(board_2_receiver_task, "read", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
-  xTaskCreate(board_1_sender_task, "write", 2048 / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-
-  vTaskStartScheduler();
-}
-
-/* --------------------------------- PART 2 --------------------------------- */
-
-void part2() {
-  uart_lab__init(UART_3, 96000000, 38400);
-  configure_uart3_pin();
-  uart__enable_receive_interrupt(UART_3);
-
-  xTaskCreate(uart_read_task_fromISR, "read", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
-  xTaskCreate(uart_write_task, "write", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
-
-  vTaskStartScheduler();
-}
-
-/* --------------------------------- PART 1 --------------------------------- */
-
-void part0_1() {
-
-  uart_lab__init(UART_3, 96000000, 38400);
-  configure_uart3_pin();
-
-  xTaskCreate(uart_read_task, "read", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
-  xTaskCreate(uart_write_task, "write", 2048 / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
-
-  vTaskStartScheduler();
-}
-
-/* -------------------------------------------------------------------------- */
-/*                          INTERUPT SERVICE ROUTINE                          */
-/* -------------------------------------------------------------------------- */
-
-/* --------------------------------- UART_3 --------------------------------- */
-
-static void your_receive_interrupt_UART3(void) {
-  //  why you got interrupted
-  if (((LPC_UART3->IIR >> 1) & 0xF) == 0x2) {
-    //   IIR status, read the LSR register
-    while (!(LPC_UART3->LSR & (1 << 0))) {
-      ;
-    }
-  }
-  //  read the RBR register --> RX Queue
-  const char byte = LPC_UART3->RBR;
-
-  xQueueSendFromISR(your_uart_rx_queue, &byte, NULL);
-  // fprintf(stderr, "UART3\n");
-}
-
-/* --------------------------------- UART_2 --------------------------------- */
-
-static void your_receive_interrupt_UART2(void) {
-  //  why you got interrupted
-  if (((LPC_UART2->IIR >> 1) & 0xF) == 0x2) {
-    //   IIR status, read the LSR register
-    while (!(LPC_UART2->LSR & (1 << 0))) {
-      ;
-    }
-  }
-  //  read the RBR register --> RX Queue
-  const char byte = LPC_UART2->RBR;
-
-  xQueueSendFromISR(your_uart_rx_queue, &byte, NULL);
-  // fprintf(stderr, "UART2\n");
-}
-
-/* -------------------------------------------------------------------------- */
-/*                             INITIALIZE INTERUPT                            */
-/* -------------------------------------------------------------------------- */
-
-void uart__enable_receive_interrupt(uart_number_e uart_number) {
-  // attach your interrupt
-  if (uart_number) {
-    NVIC_EnableIRQ(UART3_IRQn);
-    lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__UART3, your_receive_interrupt_UART3, NULL);
-
-    //  IER register
-    LPC_UART3->LCR &= ~(1 << 7);
-    LPC_UART3->IER |= (1 << 0);
-
-    // Create your RX queue
-    your_uart_rx_queue = xQueueCreate(5, sizeof(char));
-  } else {
-    NVIC_EnableIRQ(UART2_IRQn);
-    lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__UART2, your_receive_interrupt_UART2, NULL);
-
-    //  IER register
-    LPC_UART2->LCR &= ~(1 << 7);
-    LPC_UART2->IER |= (1 << 0);
-
-    // Create your RX queue
-    your_uart_rx_queue = xQueueCreate(16, sizeof(char));
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/*                             QUEUE RECEIVE DATA                             */
-/* -------------------------------------------------------------------------- */
-
-bool uart_lab__get_char_from_queue(char *input_byte, uint32_t timeout) {
-  // printf("Got data from ISR\n");
-  return xQueueReceive(your_uart_rx_queue, input_byte, timeout);
-}
-
-/* -------------------------------------------------------------------------- */
-/*                     READ FROM INTERUPT SERVICE ROUTINE                     */
-/* -------------------------------------------------------------------------- */
-
-void uart_read_task_fromISR(void *p) {
-  while (1) {
-    char *input;
-    // printf("Before checking into ISR\n");
-    if (uart_lab__get_char_from_queue(&input, 100)) {
-      // uart_lab__polled_get(UART__3, &input);
-      printf("%d: Queue received: %c\n\n", counter_1, input);
-      counter_1++;
-    }
-    // if we want to see no writing data to the queue behavior
-    else {
-      printf("No data for 100ms\n");
-    }
-    // vTaskDelay(500);
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/*                          READ FUNCTION FOR TASK 1                          */
-/* -------------------------------------------------------------------------- */
-
-void uart_read_task(void *p) {
-  while (1) {
-    // TODO: Use uart_lab__polled_get() function and printf the received value
-    char *input;
-    // printf("crash at get\n");
-    uart_lab__polled_get(UART_3, &input);
-    printf("%c", input);
-    vTaskDelay(500);
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/*                        WRITE FUNCTION FOR BOTH TASKS                       */
-/* -------------------------------------------------------------------------- */
-
-void uart_write_task(void *p) {
-  while (1) {
-    uart_lab__polled_put(UART_3, 'h');
-    uart_lab__polled_put(UART_3, 'e');
-    uart_lab__polled_put(UART_3, 'l');
-    uart_lab__polled_put(UART_3, 'l');
-    uart_lab__polled_put(UART_3, 'o');
-    uart_lab__polled_put(UART_3, '\n');
-    vTaskDelay(500);
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/*                          SENDER PART EXTRA CREDIT                          */
-/* -------------------------------------------------------------------------- */
-int lanchay = 0;
-// This task is done for you, but you should understand what this code is doing
-void board_1_sender_task(void *p) {
-  char number_as_string[16] = {0};
-  while (true) {
-    lanchay++;
-    const int number = rand() % 1000;
-    printf("RANDOM NUMBER IS: %d\n", number);
-    sprintf(number_as_string, "%i", number);
-    // Send one char at a time to the other board including terminating NULL char
-    for (int i = 0; i <= strlen(number_as_string); i++) {
-      uart_lab__polled_put(UART_3, number_as_string[i]);
-      // printf("Sent: %c\n", number_as_string[i]);
-    }
-
-    // printf("Sent: %i over UART to the other board\n", number);
-    vTaskDelay(3000);
-  }
-}
-
-/* -------------------------------------------------------------------------- */
-/*                         RECEIVER PART EXTRA CREDIT                         */
-/* -------------------------------------------------------------------------- */
-
-void board_2_receiver_task(void *p) {
-  char number_as_string[16] = {0};
-  int counter = 0;
-
-  while (true) {
-    char byte = 0;
-    uart_lab__get_char_from_queue(&byte, portMAX_DELAY);
-    printf("Received: %c\n", byte);
-    // sprintf(number_as_string, "", byte);
-    // printf("STRING: %s\n", number_as_string);
-
-    // This is the last char, so print the number
-    if ('\0' == byte) {
-      number_as_string[counter] = '\0';
-      counter = 0;
-      printf("Received this number from UART 3: %s\n\n\n", number_as_string);
-    }
-    // // We have not yet received the NULL '\0' char, so buffer the data
-    else {
-      // TODO: Store data to number_as_string[] array one char at a time
-      // Hint: Use counter as an index, and increment it as long as we do not reach max value of 16
-      number_as_string[counter] = byte;
-      printf("loading: %s\n", number_as_string);
-      counter++;
-    }
-  }
+  // P_C_Same_Priority();
+  extra_credit_cli_handler();
 }
