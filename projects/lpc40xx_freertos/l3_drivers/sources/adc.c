@@ -59,20 +59,7 @@ void adc__enable_burst_mode(adc_channel_e channel_num) {
 }
 
 int adc__get_channel_reading_with_burst_mode() {
-  // fprintf(stderr, "in ADC GET RESULT: \n");
   int result = 0;
-  // uint32_t result1 = 0;
-  // uint32_t bit_32;
-  // uint32_t clear = 0;
-  // clear = (LPC_ADC->DR[2] >> 4) & 0x0FFF;
-  // fprintf(stderr, "Clear: %ld\n", clear);
-  // // clear = LPC_ADC->DR[2] & 0xFFFF;
-  // bit_32 = LPC_ADC->GDR & 0xFFFF;
-  // fprintf(stderr, "DONE: %ld\n", bit_32);
   result = (LPC_ADC->DR[2] >> 4) & 0x0FFF; // 12bits - B15:B4
   return result;
-  // result1 = LPC_ADC->STAT & 0xffff;
-  // fprintf(stderr, "result1: %ld\n", result1);
-  // fprintf(stderr, "BIG_______result: %d\n", result);
-  // delay__ms(300);
 }

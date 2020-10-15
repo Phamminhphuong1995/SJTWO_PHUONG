@@ -4,6 +4,7 @@
 #include "clock.h"
 #include "gpio.h"
 #include "gpio_lab.h"
+#include "lcd.h"
 #include "periodic_scheduler.h"
 #include "queue.h"
 #include "sj2_cli.h"
@@ -100,12 +101,17 @@ void extra_credit_cli_handler(void) {
       xQueueCreate(1, sizeof(switch_e)); // Choose depth of item being our enum (1 should be okay for this example)
   vTaskStartScheduler();
 }
+
+void lcd() {
+  turn_on_lcd();
+  while (1) {
+  }
+}
 void main(void) {
 
   // P_Low_C_High();
-
   // P_High_C_Low();
-
   // P_C_Same_Priority();
-  extra_credit_cli_handler();
+  // extra_credit_cli_handler();
+  lcd();
 }
