@@ -4,7 +4,7 @@
 #include "clock.h"
 #include "gpio.h"
 #include "gpio_lab.h"
-#include "lcd.h"
+#include "oled.h"
 #include "periodic_scheduler.h"
 #include "queue.h"
 #include "sj2_cli.h"
@@ -102,8 +102,11 @@ void extra_credit_cli_handler(void) {
   vTaskStartScheduler();
 }
 
-void lcd() {
-  turn_on_lcd();
+void oled() {
+  turn_on_oled();
+  display("P LOVE MAI");
+  delay__ms(2500);
+  horizontal_scrolling();
   while (1) {
   }
 }
@@ -113,5 +116,5 @@ void main(void) {
   // P_High_C_Low();
   // P_C_Same_Priority();
   // extra_credit_cli_handler();
-  lcd();
+  oled();
 }
