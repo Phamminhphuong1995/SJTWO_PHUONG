@@ -6,7 +6,7 @@
 #include "string.h"
 
 /* -------------------- Array of char_to_display_on_oled -------------------- */
-static function_pointer_oled oled_callbacksR[127] = {};
+static function_pointer_oled oled_callbacksR[128] = {};
 
 /**
  *  This function clear the entire a screen
@@ -122,6 +122,15 @@ void vertical_addr_mode() {
   /* -------------------------------------------------------------------------- */
 }
 
+void set_page_start() {
+  cs_oled();
+  {
+    DC_toggle_command();
+    SSP1__exchange_byte_lab(0xB2);
+    // SSP1__exchange_byte_lab(0x07);
+  }
+  ds_oled();
+}
 /**
  * Pannel initialization for the LED screen.
  * This init set the screen to horizontal mode
@@ -333,6 +342,39 @@ void char_space() {
   SSP1__exchange_byte_lab(0x00);
 }
 
+void char_1() {
+  SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x42);
+  SSP1__exchange_byte_lab(0x7F);
+  SSP1__exchange_byte_lab(0x40);
+  SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x00);
+}
+
+void char_4() {
+  SSP1__exchange_byte_lab(0x18);
+  SSP1__exchange_byte_lab(0x14);
+  SSP1__exchange_byte_lab(0x12);
+  SSP1__exchange_byte_lab(0x7F);
+  SSP1__exchange_byte_lab(0x10);
+  SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x00);
+}
+
+void char_6() {
+  SSP1__exchange_byte_lab(0x3C);
+  SSP1__exchange_byte_lab(0x4A);
+  SSP1__exchange_byte_lab(0x49);
+  SSP1__exchange_byte_lab(0x49);
+  SSP1__exchange_byte_lab(0x30);
+  SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x00);
+}
+
 /* -------------------------------------------------------------------------- */
 /*                          END OF DEFINING CHARACTER                         */
 /* -------------------------------------------------------------------------- */
@@ -400,6 +442,9 @@ void set_up_char_array() {
   oled_callbacksR[(int)'V'] = char_V;
   oled_callbacksR[(int)' '] = char_space;
   oled_callbacksR[(int)'O'] = char_O_letter;
+  oled_callbacksR[(int)'1'] = char_1;
+  oled_callbacksR[(int)'4'] = char_4;
+  oled_callbacksR[(int)'6'] = char_6;
 }
 
 /**
