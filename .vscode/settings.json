@@ -1,6 +1,10 @@
 {
     "files.associations": {
-        "*.def": "c"
+        "*.def": "c",
+        "random": "c",
+        "string": "c",
+        "array": "c",
+        "string_view": "c"
     },
     "git.ignoreLimitWarning": true
 }

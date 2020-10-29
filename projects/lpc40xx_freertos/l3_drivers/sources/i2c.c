@@ -1,5 +1,9 @@
 #include "i2c.h"
 
+/* ---------------------------- include slave i2c --------------------------- */
+#include "i2c_slave.h"
+/* -------------------------------------------------------------------------- */
+
 #include "FreeRTOS.h"
 #include "semphr.h"
 #include "task.h"
@@ -44,6 +48,13 @@ typedef struct {
   uint8_t *input_byte_pointer;        ///< Used for reading I2C slave device
   const uint8_t *output_byte_pointer; ///< Used for writing data to the I2C slave device
   size_t number_of_bytes_to_transfer;
+
+  /* -------------------------------------------------------------------------- */
+  /*          New added variable to extend i2C driver to work for slave         */
+  /* -------------------------------------------------------------------------- */
+  bool is_register_add_or_data;
+  uint8_t register_address_of_slave;
+
 } i2c_s;
 
 /// Instances of structs for each I2C peripheral
@@ -274,6 +285,18 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
     I2C__STATE_MR_SLAVE_READ_NACK = 0x48,
     I2C__STATE_MR_SLAVE_ACK_SENT = 0x50,
     I2C__STATE_MR_SLAVE_NACK_SENT = 0x58,
+
+    /* -------------------------------------------------------------------------- */
+    /*                                Slave states                                */
+    /* -------------------------------------------------------------------------- */
+    I2C__STATE_SLAVE_RECEIVER_MASTER_TRANSMITTER_ACK_0X60 = 0X60,
+    I2C__STATE_SLAVE_RECEIVER_MASTER_TRANSMITTER_ACK_SENT_0X80 = 0X80,
+    I2C__STATE_SLAVE_RECEIVER_MASTER_TRANSMITTER_NACK_SENT_0XA0 = 0XA0,
+    /* -------------------------------------------------------------------------- */
+    I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_ACK_0XA8 = 0XA8,
+    I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_NACK_0XB8 = 0XB8,
+    I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_ACK_0XC8 = 0XC8,
+    I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_NACK_0XC0 = 0XC0,
   };
 
   bool stop_sent = false;
@@ -381,6 +404,68 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
     stop_sent = true;
     i2c->error_code = lpc_i2c->STAT;
     break;
+
+    /* -------------------------------------------------------------------------- */
+    /*                          SLAVE STATE MACHINE CODE                          */
+    /* -------------------------------------------------------------------------- */
+    //     I2C__STATE_SLAVE_RECEIVER_MASTER_TRANSMITTER_ACK_0X60 = 0X60,
+    //     I2C__STATE_SLAVE_RECEIVER_MASTER_TRANSMITTER_ACK_SENT_0X80 = 0X80,
+    //     I2C__STATE_SLAVE_RECEIVER_MASTER_TRANSMITTER_NACK_SENT_0XA0 = 0XA0,
+    // /* -------------------------------------------------------------------------- */
+    //     I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_ACK_0XA8 = 0XA8,
+    //     I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_NACK_0XB8 = 0XB8,
+    //     I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_ACK_0XC8 = 0XC8,
+    //     I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_NACK_0XC0 = 0XC0,
+  case I2C__STATE_SLAVE_RECEIVER_MASTER_TRANSMITTER_ACK_0X60:
+    i2c->is_register_add_or_data = true; // setting up to get register add
+    i2c__set_ack_flag(lpc_i2c);
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+  case I2C__STATE_SLAVE_RECEIVER_MASTER_TRANSMITTER_ACK_SENT_0X80:
+    if (i2c->is_register_add_or_data) {
+      i2c->register_address_of_slave = lpc_i2c->DAT;
+      i2c->is_register_add_or_data = false; // done with reg address
+    } else {
+      if (i2c_write_slave(i2c->register_address_of_slave++, lpc_i2c->DAT)) {
+        ;
+      } else {
+        fprintf(stderr, "Failed to write data into the slave devices\n");
+      }
+    }
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+  case I2C__STATE_SLAVE_RECEIVER_MASTER_TRANSMITTER_NACK_SENT_0XA0:
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+
+    /* -------------------------------------------------------------------------- */
+  case I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_ACK_0XA8:
+    if (i2c_read_slave(i2c->register_address_of_slave++, &lpc_i2c->DAT)) {
+      ;
+    } else {
+      fprintf(stderr, "Failed to read data into the slave devices\n");
+    }
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+  case I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_NACK_0XB8:
+    if (i2c_read_slave(i2c->register_address_of_slave++, &lpc_i2c->DAT)) {
+      ;
+    } else {
+      fprintf(stderr, "Failed to read data into the slave devices\n");
+    }
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+    // NOTE: do we need a break
+  case I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_ACK_0XC8:
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+  case I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_NACK_0XC0:
+    i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
+    break;
+
+    /* -------------------------------------------------------------------------- */
+    /*                       END OF STATE SLAVE MACHINE CODE                      */
+    /* -------------------------------------------------------------------------- */
 
   case I2C__STATE_MT_SLAVE_ADDR_NACK: // no break
   case I2C__STATE_MT_SLAVE_DATA_NACK: // no break
