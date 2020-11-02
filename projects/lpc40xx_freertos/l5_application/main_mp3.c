@@ -63,7 +63,10 @@ void reader_task() {
   while (1) {
     if (xQueueReceive(Q_trackname, song_name, portMAX_DELAY)) {
       printf("Song name is: %s", song_name);
+      display("testing\n");
       display(song_name);
+      display("\ntesting\n");
+      display("djawkl");
       /* -------------------------------- OPEN FILE ------------------------------- */
       const char *filename = song_name;
       FIL file; // create object file
@@ -93,8 +96,8 @@ void player_task() {
         while (!GPIO__get_level(2, 0)) {
           vTaskDelay(1); // waiting for DREQ
         }
-        printf("%x ", byte_512[i]);
         send_data_to_decoder(byte_512[i]);
+        printf("%x ", byte_512[i]);
       }
     }
   }

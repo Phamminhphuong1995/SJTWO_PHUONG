@@ -133,7 +133,7 @@ void SPI_send_mp3_data(char byte) {
   // Once DREQ is released (high) we can now send a byte of data
   gpio__lab_set(2, 2, false); // Select Data
   SSP0__exchange_byte(byte);  // Send SPI byte
-  gpio__lab_set(2, 2, true); // Deselect Data
+  gpio__lab_set(2, 2, true);  // Deselect Data
 }
 
 void setBass(uint8_t amplitude, uint8_t frequency) {

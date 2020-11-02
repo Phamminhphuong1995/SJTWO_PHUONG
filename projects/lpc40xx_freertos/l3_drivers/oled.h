@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 uint8_t bitmap_[8][128];
+// uint8_t cursor = 0x00;
 // Function pointer type (demonstrated later in the code sample)
 typedef void (*function_pointer_oled)(void);
 void oled_ini();
@@ -24,6 +25,7 @@ void set_page_start();
 void display(char *str);
 void set_up_char_array();
 
+void new_line(uint8_t address);
 /* ----------------------------- Covert to Pixel ---------------------------- */
 void char_A();
 void char_B();

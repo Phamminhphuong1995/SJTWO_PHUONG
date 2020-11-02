@@ -10,7 +10,7 @@ static size_t number_of_songs;
 static void song_list__handle_filename(const char *filename) {
   // This will not work for cases like "file.mp3.zip"
   if (NULL != strstr(filename, ".mp3")) {
-    printf("\nFilename: %s\n", filename);
+    // printf("\nFilename: %s\n", filename);
 
     // Dangerous function: If filename is > 128 chars, then it will copy extra bytes leading to memory corruption
     // strcpy(list_of_songs[number_of_songs], filename);
@@ -21,13 +21,13 @@ static void song_list__handle_filename(const char *filename) {
 
     // Best: Compensates for the null, so if 128 char filename, then it copies 127 chars, AND the NULL char
     // snprintf(list_of_songs[number_of_songs], sizeof(song_memory_t), "%.149s", filename);
-    puts("checking for list of songs\n");
-    for (int i = 0; i < strlen(list_of_songs); i++) {
-      for (int j = 0; j < strlen(list_of_songs[i]); j++) {
-        putchar(list_of_songs[i][j]);
-      }
-    }
-    puts("\n");
+    // puts("checking for list of songs\n");
+    // for (int i = 0; i < strlen(list_of_songs); i++) {
+    //   for (int j = 0; j < strlen(list_of_songs[i]); j++) {
+    //     putchar(list_of_songs[i][j]);
+    //   }
+    // }
+    // puts("\n");
     ++number_of_songs;
     // or
     // number_of_songs++;

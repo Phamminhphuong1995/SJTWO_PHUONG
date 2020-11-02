@@ -1357,6 +1357,15 @@ void horizontal_scrolling() {
   ds_oled();
 }
 
+void new_line(uint8_t address) {
+  // fprintf(stderr, "in new line\n");
+  DC_toggle_command();
+  SSP1__exchange_byte_lab(0xB0 | address);
+  fprintf(stderr, "set column\n");
+  SSP1__exchange_byte_lab(0x10);
+  SSP1__exchange_byte_lab(0x00);
+  DC_toggle_data();
+}
 /**
  * Setting up the function_callback to the array oled_callbacksR
  * NOTE this fuction use int casting to get the ASCII value of the char
@@ -1386,16 +1395,26 @@ void horizontal_scrolling() {
  * Getting the function callback at oled_callbacksR array using ASCII value
  * And using the point to execute them
  */
+uint8_t cursor;
 void display(char *str) {
   cs_oled();
   {
     DC_toggle_data();
     for (int i = 0; i < strlen(str); i++) {
+      // fprintf(stderr, "before crash\n");
+      // if (str[i] == '\0') {
+      //   break;
+      // }
+      if (str[i] == '\n') {
+        cursor++;
+        new_line(cursor);
+        continue;
+      }
       function_pointer_oled oled_handler = oled_callbacksR[(int)(str[i])];
       oled_handler();
     }
+    ds_oled();
   }
-  ds_oled();
 }
 /**
  * The sequence to turn on and  Initialize the OLED

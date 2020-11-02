@@ -112,36 +112,34 @@ int main(void) {
   menu_semaphore = xSemaphoreCreateBinary();
   accelerometer_semaphore = xSemaphoreCreateBinary();
 
-  lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, gpio0__interrupt_dispatcher);
-  gpio0__attach_interrupt(29, GPIO_INTR__FALLING_EDGE, volumeup_isr);
-  gpio0__attach_interrupt(30, GPIO_INTR__FALLING_EDGE, volumedown_isr); // step 3.5 attach the interrupt
-  gpio0__attach_interrupt(7, GPIO_INTR__FALLING_EDGE, pass_song_isr);
-  gpio0__attach_interrupt(6, GPIO_INTR__FALLING_EDGE, move_up_isr);
-  gpio0__attach_interrupt(8, GPIO_INTR__FALLING_EDGE, move_down_isr);
-  gpio0__attach_interrupt(25, GPIO_INTR__FALLING_EDGE, bass_down_isr);
-  gpio0__attach_interrupt(26, GPIO_INTR__FALLING_EDGE, bass_up_isr);
-  gpio0__attach_interrupt(0, GPIO_INTR__FALLING_EDGE, treble_up_isr);
-  gpio0__attach_interrupt(1, GPIO_INTR__FALLING_EDGE, treble_down_isr);
-  gpio0__attach_interrupt(16, GPIO_INTR__FALLING_EDGE, pause_isr);
-  gpio0__attach_interrupt(22, GPIO_INTR__FALLING_EDGE, menu_isr);
-  gpio0__attach_interrupt(9, GPIO_INTR__FALLING_EDGE, accelerometer_isr);
+  // lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, gpio0__interrupt_dispatcher);
+  // gpio0__attach_interrupt(29, GPIO_INTR__FALLING_EDGE, volumeup_isr);
+  // gpio0__attach_interrupt(30, GPIO_INTR__FALLING_EDGE, volumedown_isr); // step 3.5 attach the interrupt
+  // gpio0__attach_interrupt(7, GPIO_INTR__FALLING_EDGE, pass_song_isr);
+  // gpio0__attach_interrupt(6, GPIO_INTR__FALLING_EDGE, move_up_isr);
+  // gpio0__attach_interrupt(8, GPIO_INTR__FALLING_EDGE, move_down_isr);
+  // gpio0__attach_interrupt(25, GPIO_INTR__FALLING_EDGE, bass_down_isr);
+  // gpio0__attach_interrupt(26, GPIO_INTR__FALLING_EDGE, bass_up_isr);
+  // gpio0__attach_interrupt(0, GPIO_INTR__FALLING_EDGE, treble_up_isr);
+  // gpio0__attach_interrupt(1, GPIO_INTR__FALLING_EDGE, treble_down_isr);
+  // gpio0__attach_interrupt(16, GPIO_INTR__FALLING_EDGE, pause_isr);
+  // gpio0__attach_interrupt(22, GPIO_INTR__FALLING_EDGE, menu_isr);
+  // gpio0__attach_interrupt(9, GPIO_INTR__FALLING_EDGE, accelerometer_isr);
 
   // enable GPIO interrupt
   NVIC_EnableIRQ(GPIO_IRQn);
   init_SPI();
   mp3_setup();
-  lcd_menu_switch_init();
-  acceleration__init();
+  // lcd_menu_switch_init();
+  // acceleration__init();
 
   sj2_cli__init();
-  gpio__lab_set_low(2, 4);
-  gpio__lab_set_high(2, 4);
-  xTaskCreate(mp3_reader_task, "reader", (2024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(mp3_player_task, "player", (3096 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM,
-              &player_handle); // made a change here
 
+  xTaskCreate(mp3_reader_task, "reader", (2024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   // xTaskCreate(volumeup_task, "volumeup", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   // xTaskCreate(volumedwn_task, "volumedwn", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(mp3_player_task, "player", (3096 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM,
+              &player_handle); // made a change here
   // xTaskCreate(mp3_screen_control_task, "screen controls", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   // xTaskCreate(mp3_screen_control_task2, "move arrow down", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   // xTaskCreate(pass_song_name_task, "pass", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
@@ -367,32 +365,15 @@ void mp3_player_task(void *p) {
   while (1) {
     char bytes_512[512];
     xQueueReceive(Q_songdata, bytes_512, portMAX_DELAY);
-    // puts("\n");
     for (int i = 0; i < 512; i++) {
       // printf("%x \t", bytes_512[i]);
       while (!gpio__lab_get_level(2, 0)) {
         vTaskDelay(1);
       }
-      // putchar(bytes_512[i]);
       SPI_send_mp3_data(bytes_512[i]);
     }
     // printf("Received 512 bytes : %d\n", counter);
     counter++;
-
-    /* -------------------------------------------------------------------------- */
-    // This is testing to understand how to get the track number and is playing
-    /* -------------------------------------------------------------------------- */
-    char current_song[128];
-    current_track_number = 2;
-    strncpy(current_song, song_list__get_name_for_item(current_track_number), sizeof(current_song) - 1);
-    for (int i = 0; i < strlen(current_song); i++) {
-      putchar(current_song[i]);
-    }
-    puts("\n");
-
-    /* -------------------------------------------------------------------------- */
-    /*                                     END                                    */
-    /* -------------------------------------------------------------------------- */
   }
 }
 
