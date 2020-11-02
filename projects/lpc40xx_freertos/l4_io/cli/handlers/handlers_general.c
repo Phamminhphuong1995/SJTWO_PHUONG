@@ -1,8 +1,10 @@
 #include "FreeRTOS.h"
 #include "cli_handlers.h"
+#include "queue.h"
 #include "sl_string.h"
 #include "task.h"
 #include <stdio.h>
+#include <string.h>
 static void cli__task_list_print(sl_string_t user_input_minus_command_name, app_cli__print_string_function cli_output);
 
 /* --------------------------------- PHUONG --------------------------------- */
@@ -53,6 +55,29 @@ app_cli_status_e cli__phuong_handler(app_cli__argument_t argument, sl_string_t u
     cli_output(NULL, "Did you mean to say suspend or resume?\n");
   }
 
+  return APP_CLI_STATUS__SUCCESS;
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                 MP3 HANDLER                                */
+/* -------------------------------------------------------------------------- */
+
+extern QueueHandle_t Q_trackname;
+app_cli_status_e cli__mp3_play(app_cli__argument_t argument, sl_string_t user_input_minus_command_name,
+                               app_cli__print_string_function cli_output) {
+  // user_input_minus_command_name is actually a 'char *' pointer type
+  // We tell the Queue to copy 32 bytes of songname from this location
+  trackname_t trackname;
+  memset(trackname, 0, sizeof(trackname));
+
+  if (sl_string__get_length(user_input_minus_command_name) < 63) {
+    strncpy(trackname, user_input_minus_command_name, 64);
+    printf("before send to Q\n");
+    xQueueSend(Q_trackname, trackname, portMAX_DELAY);
+    printf("Sent %s over to the Q_songname\n", user_input_minus_command_name);
+  } else {
+    printf("Error: please enter in a song name less than 64 characters \n");
+  }
   return APP_CLI_STATUS__SUCCESS;
 }
 

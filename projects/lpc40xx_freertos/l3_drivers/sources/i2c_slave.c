@@ -15,6 +15,13 @@ void i2c_slave_init_loopback(uint8_t slave_address_not_reg_address) {
 
 /* -------------- Write data to Slave AKA slave is the receiver ------------- */
 bool i2c_write_slave(uint8_t mem_location, uint8_t data_write) {
+
+  /* ----------- the check is not needed today because we are using ----------- */
+
+  /* ------- the unsigned mem_location so the range wont go out of bound ------ */
+
+  /* ---------------- but in the future, the check can be handy --------------- */
+
   bool write_status;
   if (mem_location > 256 || mem_location < 0) {
     fprintf(stderr, "Out of bound memory");

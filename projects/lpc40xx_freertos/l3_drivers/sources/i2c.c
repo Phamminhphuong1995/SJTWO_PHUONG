@@ -416,6 +416,10 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
     //     I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_NACK_0XB8 = 0XB8,
     //     I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_ACK_0XC8 = 0XC8,
     //     I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_NACK_0XC0 = 0XC0,
+
+    /* -------------------------------------------------------------------------- */
+    /*                                SLAVE READING                               */
+    /* -------------------------------------------------------------------------- */
   case I2C__STATE_SLAVE_RECEIVER_MASTER_TRANSMITTER_ACK_0X60:
     i2c->is_register_add_or_data = true; // setting up to get register add
     i2c__set_ack_flag(lpc_i2c);
@@ -439,6 +443,11 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
     break;
 
     /* -------------------------------------------------------------------------- */
+
+    /* -------------------------------------------------------------------------- */
+    /*                                SLAVE WRITING                               */
+    /* -------------------------------------------------------------------------- */
+
   case I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_ACK_0XA8:
     if (i2c_read_slave(i2c->register_address_of_slave++, &lpc_i2c->DAT)) {
       ;
@@ -455,7 +464,6 @@ static bool i2c__handle_state_machine(i2c_s *i2c) {
     }
     i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
     break;
-    // NOTE: do we need a break
   case I2C__STATE_SLAVE_TRANSMITTER_MASTER_RECEIVER_ACK_0XC8:
     i2c__clear_si_flag_for_hw_to_take_next_action(lpc_i2c);
     break;

@@ -33,6 +33,11 @@ void sj2_cli__init(void) {
                                              "Outputs list of RTOS tasks, CPU and stack usage.\n"
                                              "tasklist <time>' will display CPU utilization within this time window.",
                                          .app_cli_handler = cli__task_list};
+  /* -------------------------------------------------------------------------- */
+
+  static app_cli__command_s play = {.command_name = "play",
+                                    .help_message_for_command = "Allows you to play a mp3 file by passing name \n",
+                                    .app_cli_handler = cli__mp3_play};
 
   /* ------------------------- My own handler------------------------- */
 
@@ -47,6 +52,7 @@ void sj2_cli__init(void) {
   /* ----------------------------- Phuong HANDLER ----------------------------- */
 
   app_cli__add_command_handler(&sj2_cli_struct, &Phuong_cli_struct);
+  app_cli__add_command_handler(&sj2_cli_struct, &play);
 
   /* ----------------------------- end of my code ----------------------------- */
 
