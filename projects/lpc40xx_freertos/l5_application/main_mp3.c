@@ -7,9 +7,10 @@
 #include "mp3_init.h"
 #include "oled.h"
 #include "queue.h"
-// #include "semaphore.h"
 #include "sj2_cli.h"
 #include "task.h"
+#include <string.h>
+
 SemaphoreHandle_t pause_semaphore;
 QueueHandle_t Q_trackname;
 QueueHandle_t Q_songdata;
@@ -55,7 +56,7 @@ void pause_task() {
     }
   }
 }
-
+char *song_name_without_dot_mp3;
 void reader_task() {
   trackname_t song_name;
   uint8_t byte_512[512];
@@ -63,8 +64,9 @@ void reader_task() {
   while (1) {
     if (xQueueReceive(Q_trackname, song_name, portMAX_DELAY)) {
       printf("Song name is: %s", song_name);
-      display("testing\n");
-      display(song_name);
+      display("Playing\n");
+      song_name_without_dot_mp3 = remove_dot_mp3(song_name);
+      display(song_name_without_dot_mp3);
       display("\ntesting\n");
       display("djawkl");
       /* -------------------------------- OPEN FILE ------------------------------- */

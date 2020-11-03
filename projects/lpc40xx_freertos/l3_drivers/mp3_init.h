@@ -1,7 +1,10 @@
+#include "cli_handlers.h"
 #include "gpio.h"
 #include "gpio_lab.h"
+#include "oled.h"
 #include "spi0.h"
 #include <stdio.h>
+#include <string.h>
 
 #define SCI_MODE 0x00
 #define SCI_STATUS 0x01
@@ -9,7 +12,7 @@
 #define SCI_CLOCKF 0x03
 #define SCI_VOL 0x0B
 void mp3_init();
-
+char *remove_dot_mp3(char *current_song);
 void mp3_configured_pin();
 
 void deactive_reset_decoder();
