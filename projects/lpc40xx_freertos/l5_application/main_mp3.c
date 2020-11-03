@@ -67,8 +67,7 @@ void reader_task() {
       display("Playing\n");
       song_name_without_dot_mp3 = remove_dot_mp3(song_name);
       display(song_name_without_dot_mp3);
-      display("\ntesting\n");
-      display("djawkl");
+      horizontal_scrolling();
       /* -------------------------------- OPEN FILE ------------------------------- */
       const char *filename = song_name;
       FIL file; // create object file
@@ -99,7 +98,7 @@ void player_task() {
           vTaskDelay(1); // waiting for DREQ
         }
         send_data_to_decoder(byte_512[i]);
-        printf("%x ", byte_512[i]);
+        // printf("%x ", byte_512[i]);
       }
     }
   }

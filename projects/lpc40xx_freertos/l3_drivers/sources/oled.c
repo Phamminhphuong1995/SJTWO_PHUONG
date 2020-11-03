@@ -121,7 +121,23 @@ void vertical_addr_mode() {
   /* -------------------------------------------------------------------------- */
   /* -------------------------------------------------------------------------- */
 }
+// TODO complete page addressing mode
+void page_addressing_mode() {
+  /* ---------------------------- Set address mode ---------------------------- */
+  DC_toggle_command();
+  SSP1__exchange_byte_lab(0x20);
+  SSP1__exchange_byte_lab(0x02);
 
+  /* ----------------------------- Set column mode ---------------------------- */
+  SSP1__exchange_byte_lab(0x21);
+  SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x7F);
+
+  /* ---------------------------- Set page address ---------------------------- */
+  SSP1__exchange_byte_lab(0x22);
+  SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x07);
+}
 void set_page_start() {
   cs_oled();
   {
@@ -208,7 +224,8 @@ void panel_init() {
  * NOTE credit to Khalil for the idea of this function
  */
 void update() {
-  horizontal_addr_mode();
+  // horizontal_addr_mode();
+  new_line(0x00);
   for (int row = 0; row < 8; row++) {
     for (int column = 0; column < 128; column++) {
       DC_toggle_data();
@@ -1347,9 +1364,9 @@ void horizontal_scrolling() {
     DC_toggle_command();
     SSP1__exchange_byte_lab(0x26);
     SSP1__exchange_byte_lab(0x00); // dummy byte
-    SSP1__exchange_byte_lab(0x00); // start Page 0
+    SSP1__exchange_byte_lab(0x01); // start Page 0
     SSP1__exchange_byte_lab(0x07); // 5 frames
-    SSP1__exchange_byte_lab(0x07); // end Page 7
+    SSP1__exchange_byte_lab(0x01); // end Page 7
     SSP1__exchange_byte_lab(0x00); // dummy byte 00
     SSP1__exchange_byte_lab(0xFF); // dummy byte FF
     SSP1__exchange_byte_lab(0x2F); // activate scrolling
@@ -1361,7 +1378,7 @@ void new_line(uint8_t address) {
   // fprintf(stderr, "in new line\n");
   DC_toggle_command();
   SSP1__exchange_byte_lab(0xB0 | address);
-  fprintf(stderr, "set column\n");
+  // fprintf(stderr, "set column\n");
   SSP1__exchange_byte_lab(0x10);
   SSP1__exchange_byte_lab(0x00);
   DC_toggle_data();
