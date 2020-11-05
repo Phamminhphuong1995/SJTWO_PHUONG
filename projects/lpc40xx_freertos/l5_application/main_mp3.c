@@ -3,6 +3,7 @@
 #include "ff.h"
 #include "gpio_isr.h"
 #include "gpio_lab.h"
+#include "list_song.h"
 #include "lpc_peripherals.h"
 #include "mp3_init.h"
 #include "oled.h"
@@ -11,38 +12,89 @@
 #include "task.h"
 #include <string.h>
 
+/* -------------------------------------------------------------------------- */
+/*                              SEMAPHORE SECTION                             */
+/* -------------------------------------------------------------------------- */
+
 SemaphoreHandle_t pause_semaphore;
+SemaphoreHandle_t next_song;
+
+/* -------------------------------------------------------------------------- */
+/*                                QUEUE SECTION                               */
+/* -------------------------------------------------------------------------- */
+
 QueueHandle_t Q_trackname;
 QueueHandle_t Q_songdata;
+
+/* -------------------------------------------------------------------------- */
+/*                          TASK DECLARATION SECTION                          */
+/* -------------------------------------------------------------------------- */
+
 void reader_task();
 void player_task();
 void pause_task();
+void get_song_name();
+
+/* -------------------------------------------------------------------------- */
+/*                           GLOBAL VARIABLE SECTION                          */
+/* -------------------------------------------------------------------------- */
+
 volatile bool play_pause = true;
+uint16_t cursor_main = 0;
+char *song_name_without_dot_mp3;
+
+/* -------------------------------------------------------------------------- */
+/*                     INTERRUPT SERVICE ROUNTINE SECTION                     */
+/* -------------------------------------------------------------------------- */
+
 void pause_isr(void);
+void next_song_isr(void);
+
+/* -------------------------------------------------------------------------- */
+/*                             TASKHANDLE SECTION                             */
+/* -------------------------------------------------------------------------- */
+
 TaskHandle_t player_handle;
+
+/* ---------------------------------- MAIN ---------------------------------- */
+
 int main() {
-  puts("Before MP3_init");
+
+  /* ----------------------- utility and initialization ----------------------- */
+  populate_list_song();
+  fprintf(stderr, "\ntotal song: %d", total_of_songs());
   mp3_init();
   turn_on_oled();
   clear();
   update();
-  puts("End MP3_init\n\n");
-  puts("Begin doing reader and player");
   sj2_cli__init();
+
+  /* --------------------------- Queue and Semaphore -------------------------- */
+
   Q_trackname = xQueueCreate(1, sizeof(trackname_t));
   Q_songdata = xQueueCreate(1, 512);
   pause_semaphore = xSemaphoreCreateBinary();
-  puts("check\n");
+  next_song = xSemaphoreCreateBinary();
+
+  /* -------------------------------- Interrupt ------------------------------- */
+
   lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, gpio0__interrupt_dispatcher, "isr for port 0");
-  puts("check1\n");
   gpio0__attach_interrupt(30, GPIO_INTR__FALLING_EDGE, pause_isr);
-  //   puts("check2\n");
+  gpio0__attach_interrupt(29, GPIO_INTR__FALLING_EDGE, next_song_isr);
+
+  /* ------------------------------ Task creation ----------------------------- */
+
   xTaskCreate(reader_task, "reader", (2024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(player_task, "player", (3096 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, &player_handle);
   xTaskCreate(pause_task, "pause", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(get_song_name, "get_song_name", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   vTaskStartScheduler();
 }
-void pause_isr() { xSemaphoreGiveFromISR(pause_semaphore, NULL); }
+
+/* -------------------------------------------------------------------------- */
+/*                           TASK DEFINATION SECTION                          */
+/* -------------------------------------------------------------------------- */
+
 void pause_task() {
   while (1) {
     if (xSemaphoreTake(pause_semaphore, portMAX_DELAY)) {
@@ -56,50 +108,89 @@ void pause_task() {
     }
   }
 }
-char *song_name_without_dot_mp3;
+
 void reader_task() {
   trackname_t song_name;
   uint8_t byte_512[512];
-  UINT br; // binary
+  // binary
   while (1) {
     if (xQueueReceive(Q_trackname, song_name, portMAX_DELAY)) {
-      printf("Song name is: %s", song_name);
-      display("Playing\n");
-      song_name_without_dot_mp3 = remove_dot_mp3(song_name);
-      display(song_name_without_dot_mp3);
-      horizontal_scrolling();
       /* -------------------------------- OPEN FILE ------------------------------- */
+      UINT br;
       const char *filename = song_name;
+      fprintf(stderr, "Song name is: %s\n", filename);
       FIL file; // create object file
       FRESULT result = f_open(&file, filename, (FA_READ));
+      fprintf(stderr, "Status of result and FROK %d  %d\n", result, FR_OK);
+      fprintf(stderr, "BR is: %x\n", br);
       if (FR_OK == result) {
+        // fprintf(stderr, "debugginh-1\n");
+        f_read(&file, byte_512, sizeof(byte_512), &br);
         while (br != 0) {
+          // fprintf(stderr, "debugginh-2\n");
           f_read(&file, byte_512, sizeof(byte_512), &br);
+          // fprintf(stderr, "debugginh-3\n");
           xQueueSend(Q_songdata, byte_512, portMAX_DELAY);
+          // fprintf(stderr, "debugginh-4\n");
           if (uxQueueMessagesWaiting(Q_trackname)) {
             printf("New play song request\n");
             break;
           }
+          // fprintf(stderr, "Does it play\n");
+        }
+
+/* --------------------------- Auto play next song -------------------------- */
+        if (br == 0) {
+          xSemaphoreGive(next_song);
         }
         f_close(&file);
       } else {
-        puts("Failed to open mp3 file\n");
+        fprintf(stderr, "Failed to open the file");
       }
+      // fprintf(stderr, "debugginh0\n");
     }
+    // fprintf(stderr, "debugginh\n");
   }
 }
 
 void player_task() {
   while (1) {
     uint8_t byte_512[512];
+    // fprintf(stderr, "debugginh2\n");
     if (xQueueReceive(Q_songdata, byte_512, portMAX_DELAY)) {
+      // fprintf(stderr, "debugginh3\n");
       for (int i = 0; i < 512; i++) {
         while (!GPIO__get_level(2, 0)) {
           vTaskDelay(1); // waiting for DREQ
         }
         send_data_to_decoder(byte_512[i]);
-        // printf("%x ", byte_512[i]);
       }
     }
   }
 }
+
+void get_song_name() {
+  while (1) {
+    if (xSemaphoreTake(next_song, portMAX_DELAY)) {
+      int total = total_of_songs();
+      if (cursor_main >= total) {
+        cursor_main = 0;
+      }
+      white_Out();
+      char *song = get_songs_name(cursor_main);
+      xQueueSend(Q_trackname, song, portMAX_DELAY);
+      display("Playing\n", 0x00);
+      song_name_without_dot_mp3 = remove_dot_mp3(song);
+      display(song, 0x01);
+      horizontal_scrolling();
+      cursor_main++;
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                      INTERRUPT SERVICE ROUTINE SECTION                     */
+/* -------------------------------------------------------------------------- */
+
+void pause_isr() { xSemaphoreGiveFromISR(pause_semaphore, NULL); }
+void next_song_isr() { xSemaphoreGiveFromISR(next_song, NULL); }

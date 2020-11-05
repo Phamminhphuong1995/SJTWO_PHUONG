@@ -23,11 +23,12 @@ void page_1_mode();
 void horizontal_scrolling();
 void set_page_start();
 
-void display(char *str);
+void display(char *str, uint8_t page);
 void set_up_char_array();
 
 void new_line(uint8_t address);
 /* ----------------------------- Covert to Pixel ---------------------------- */
+void white_Out();
 void char_A();
 void char_B();
 void char_C();

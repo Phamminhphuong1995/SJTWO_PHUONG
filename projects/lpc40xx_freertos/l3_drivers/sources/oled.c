@@ -342,7 +342,28 @@ void set_up_char_array() {
   oled_callbacksR[(int)'.'] = char_period;
   oled_callbacksR[(int)'$'] = char_dollar;
 }
+void white_Out() {
+  cs_oled();
+  {
+    DC_toggle_command();
+    SSP1__exchange_byte_lab(0xB0);
+    SSP1__exchange_byte_lab(0x10);
+    SSP1__exchange_byte_lab(0x00);
 
+    DC_toggle_data();
+    for (int i = 0; i < 32; i++) {
+      SSP1__exchange_byte_lab(0x00);
+      SSP1__exchange_byte_lab(0x00);
+      SSP1__exchange_byte_lab(0x00);
+      SSP1__exchange_byte_lab(0x00);
+      SSP1__exchange_byte_lab(0x00);
+      SSP1__exchange_byte_lab(0x00);
+      SSP1__exchange_byte_lab(0x00);
+      SSP1__exchange_byte_lab(0x00);
+    }
+  }
+  ds_oled();
+}
 void char_A() {
   SSP1__exchange_byte_lab(0x7E);
   SSP1__exchange_byte_lab(0x09);
@@ -1375,10 +1396,8 @@ void horizontal_scrolling() {
 }
 
 void new_line(uint8_t address) {
-  // fprintf(stderr, "in new line\n");
   DC_toggle_command();
   SSP1__exchange_byte_lab(0xB0 | address);
-  // fprintf(stderr, "set column\n");
   SSP1__exchange_byte_lab(0x10);
   SSP1__exchange_byte_lab(0x00);
   DC_toggle_data();
@@ -1413,9 +1432,13 @@ void new_line(uint8_t address) {
  * And using the point to execute them
  */
 uint8_t cursor;
-void display(char *str) {
+void display(char *str, uint8_t page) {
   cs_oled();
   {
+    DC_toggle_command();
+    SSP1__exchange_byte_lab(0xB0 | page);
+    SSP1__exchange_byte_lab(0x10);
+    SSP1__exchange_byte_lab(0x00);
     DC_toggle_data();
     for (int i = 0; i < strlen(str); i++) {
       // fprintf(stderr, "before crash\n");
