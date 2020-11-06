@@ -33,7 +33,7 @@ QueueHandle_t Q_songdata;
 void reader_task();
 void player_task();
 void pause_task();
-void get_song_name();
+void get_current_playing_song_name();
 
 /* -------------------------------------------------------------------------- */
 /*                           GLOBAL VARIABLE SECTION                          */
@@ -87,7 +87,7 @@ int main() {
   xTaskCreate(reader_task, "reader", (2024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(player_task, "player", (3096 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, &player_handle);
   xTaskCreate(pause_task, "pause", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(get_song_name, "get_song_name", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(get_current_playing_song_name, "get_song_name", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   vTaskStartScheduler();
 }
 
@@ -121,17 +121,13 @@ void reader_task() {
       fprintf(stderr, "Song name is: %s\n", filename);
       FIL file; // create object file
       FRESULT result = f_open(&file, filename, (FA_READ));
-      fprintf(stderr, "Status of result and FROK %d  %d\n", result, FR_OK);
-      fprintf(stderr, "BR is: %x\n", br);
+      // fprintf(stderr, "Status of result and FROK %d  %d\n", result, FR_OK);
+      // fprintf(stderr, "BR is: %x\n", br);
       if (FR_OK == result) {
-        // fprintf(stderr, "debugginh-1\n");
         f_read(&file, byte_512, sizeof(byte_512), &br);
         while (br != 0) {
-          // fprintf(stderr, "debugginh-2\n");
           f_read(&file, byte_512, sizeof(byte_512), &br);
-          // fprintf(stderr, "debugginh-3\n");
           xQueueSend(Q_songdata, byte_512, portMAX_DELAY);
-          // fprintf(stderr, "debugginh-4\n");
           if (uxQueueMessagesWaiting(Q_trackname)) {
             printf("New play song request\n");
             break;
@@ -139,7 +135,7 @@ void reader_task() {
           // fprintf(stderr, "Does it play\n");
         }
 
-/* --------------------------- Auto play next song -------------------------- */
+        /* --------------------------- Auto play next song -------------------------- */
         if (br == 0) {
           xSemaphoreGive(next_song);
         }
@@ -147,18 +143,14 @@ void reader_task() {
       } else {
         fprintf(stderr, "Failed to open the file");
       }
-      // fprintf(stderr, "debugginh0\n");
     }
-    // fprintf(stderr, "debugginh\n");
   }
 }
 
 void player_task() {
   while (1) {
     uint8_t byte_512[512];
-    // fprintf(stderr, "debugginh2\n");
     if (xQueueReceive(Q_songdata, byte_512, portMAX_DELAY)) {
-      // fprintf(stderr, "debugginh3\n");
       for (int i = 0; i < 512; i++) {
         while (!GPIO__get_level(2, 0)) {
           vTaskDelay(1); // waiting for DREQ
@@ -169,20 +161,24 @@ void player_task() {
   }
 }
 
-void get_song_name() {
+void get_current_playing_song_name() {
   while (1) {
     if (xSemaphoreTake(next_song, portMAX_DELAY)) {
       int total = total_of_songs();
       if (cursor_main >= total) {
         cursor_main = 0;
       }
-      white_Out();
+      // white_Out(OLED__PAGE1, OLED_SINGLE_PAGE);
+      // white_Out(OLED__PAGE0, OLED_SINGLE_PAGE);
+      white_Out(OLED__PAGE6, OLED_ALL_PAGES);
       char *song = get_songs_name(cursor_main);
       xQueueSend(Q_trackname, song, portMAX_DELAY);
-      display("Playing\n", 0x00);
+      display("Playing: ");
       song_name_without_dot_mp3 = remove_dot_mp3(song);
-      display(song, 0x01);
-      horizontal_scrolling();
+      display(song);
+      // display_at_page(song_name_without_dot_mp3, OLED__PAGE5);
+      // horizontal_scrolling(OLED__PAGE1);
+      // white_Out(OLED__PAGE6, OLED_ALL_PAGES);
       cursor_main++;
     }
   }

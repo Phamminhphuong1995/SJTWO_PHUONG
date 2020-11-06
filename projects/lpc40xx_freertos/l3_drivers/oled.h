@@ -1,13 +1,49 @@
+#pragma once
 #include <stdint.h>
 #include <stdio.h>
+
+typedef enum {
+  OLED__PAGE0 = 0x00,
+  OLED__PAGE1 = 0x01,
+  OLED__PAGE2 = 0x02,
+  OLED__PAGE3 = 0x03,
+  OLED__PAGE4 = 0x04,
+  OLED__PAGE5 = 0x05,
+  OLED__PAGE6 = 0x06,
+  OLED__PAGE7 = 0x07,
+} oled_page;
+
+typedef enum {
+  OLED__COLUMN0 = 0x00,
+  OLED__COLUMN1 = 0x01,
+  OLED__COLUMN2 = 0x02,
+  OLED__COLUMN3 = 0x03,
+  OLED__COLUMN4 = 0x04,
+  OLED__COLUMN5 = 0x05,
+  OLED__COLUMN6 = 0x06,
+  OLED__COLUMN7 = 0x07,
+  OLED__COLUMN8 = 0x08,
+  OLED__COLUMN9 = 0x09,
+  OLED__COLUMN10 = 0x0A,
+  OLED__COLUMN11 = 0x0B,
+  OLED__COLUMN12 = 0x0C,
+  OLED__COLUMN13 = 0x0D,
+  OLED__COLUMN14 = 0x0E,
+  OLED__COLUMN15 = 0x0F,
+} oled_column;
+
+typedef enum {
+  OLED_SINGLE_PAGE = 0,
+  OLED_ALL_PAGES,
+} oled_white_out;
 uint8_t bitmap_[8][128];
 // uint8_t cursor = 0x00;
 // Function pointer type (demonstrated later in the code sample)
 typedef void (*function_pointer_oled)(void);
-void oled_ini();
-void cd_oled();
+void oled_init();
+void cs_oled();
 void ds_oled();
-uint8_t ssp1__exchange_byte_lab(uint8_t data_out);
+uint8_t SSP1__exchange_byte_lab(uint8_t data_out);
 void turn_on_oled();
 void configure_oled_PIN();
 void DC_toggle_command();
@@ -20,15 +56,17 @@ void horizontal_addr_mode();
 void horizotal_addr_mode();
 void page_addressing_mode();
 void page_1_mode();
-void horizontal_scrolling();
-void set_page_start();
+void horizontal_scrolling(oled_page page_number_oled);
+void set_page_start(oled_page page_number_oled);
+void set_column_start(oled_column column_number);
 
-void display(char *str, uint8_t page);
+void display_at_page(char *str, oled_page page_number_oled);
+void display(char *str);
 void set_up_char_array();
 
-void new_line(uint8_t address);
+void new_line(oled_page page_number_oled);
 /* ----------------------------- Covert to Pixel ---------------------------- */
-void white_Out();
+void white_Out(oled_page page_number, oled_white_out is_single_or_all);
 void char_A();
 void char_B();
 void char_C();
