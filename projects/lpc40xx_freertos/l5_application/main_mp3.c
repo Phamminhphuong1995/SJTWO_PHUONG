@@ -12,6 +12,13 @@
 #include "task.h"
 #include <string.h>
 
+typedef struct {
+  char Tag[3];
+  char Title[30];
+  char Artist[30];
+  char Album[30];
+  uint8_t genre;
+} mp3_meta_data;
 /* -------------------------------------------------------------------------- */
 /*                              SEMAPHORE SECTION                             */
 /* -------------------------------------------------------------------------- */
@@ -131,10 +138,13 @@ void reader_task() {
       FRESULT result = f_open(&file, filename, (FA_READ));
 
       /* ----------------------------- READ META_DATA ----------------------------- */
+      // FIXME
       char byte_128[128];
-      f_read(&file, byte_128, sizeof(byte_128), &br); // for meta data
+      f_lseek(&file, f_size(&file) - (sizeof(char) * 128));
+      f_read(&file, byte_128, sizeof(byte_128), &br);
+      fprintf(stderr, "Song name: %s\n", filename);
       read_meta(byte_128);
-
+      f_lseek(&file, 0);
       /* ----------------------------- READ SONG_DATA ----------------------------- */
 
       if (FR_OK == result) {
@@ -216,6 +226,9 @@ void get_current_playing_song_name() {
   display_at_page(song, OLED__PAGE7);
 }
 
+/**
+ * FIXME
+ */
 void read_meta(char *byte_128) {
   white_Out(OLED__PAGE0, OLED_SINGLE_PAGE);
   white_Out(OLED__PAGE1, OLED_SINGLE_PAGE);
@@ -226,22 +239,30 @@ void read_meta(char *byte_128) {
   white_Out(OLED__PAGE6, OLED_SINGLE_PAGE);
   int meta_index = 0;
   char meta_data[128] = {"0"};
-  if (metamp3) {
-    for (int i = 0; i < 128; i++) {
-      if (i > 20) {
-        if ((((int)(byte_128[i]) > 47) && ((int)(byte_128[i]) < 58)) ||
-            (((int)(byte_128[i]) > 64) && ((int)(byte_128[i]) < 91)) ||
-            (((int)(byte_128[i]) > 96) && ((int)(byte_128[i]) < 123))) {
-          char c = (int)(byte_128[i]);
-          meta_data[meta_index] = c;
-          meta_index++;
-        }
+  mp3_meta_data meta_data_mp3 = {0};
+  for (int i = 0; i < 128; i++) {
+    if ((((int)(byte_128[i]) > 47) && ((int)(byte_128[i]) < 58)) ||
+        (((int)(byte_128[i]) > 64) && ((int)(byte_128[i]) < 91)) ||
+        (((int)(byte_128[i]) > 96) && ((int)(byte_128[i]) < 123)) || ((int)(byte_128[i])) == 32) {
+      char c = (int)(byte_128[i]);
+      if (i < 3) {
+        meta_data_mp3.Tag[i] = c;
+      } else if (i > 2 && i < 33) {
+        meta_data_mp3.Artist[i - 3] = c;
+      } else if (i > 32 && i < 63) {
+        meta_data_mp3.Album[i - 33] = c;
+      } else if (i == 127) {
+        meta_data_mp3.genre = (int)(byte_128[i]);
       }
+      meta_data[meta_index] = c;
+      meta_index++;
     }
-    display(meta_data);
-    horizontal_scrolling(OLED__PAGE7);
   }
-  metamp3 = false;
+  display_at_page(meta_data_mp3.Tag, OLED__PAGE1);
+  display_at_page(meta_data_mp3.Artist, OLED__PAGE2);
+  display_at_page(meta_data_mp3.Album, OLED__PAGE3);
+  // display_at_page(meta_data_mp3.genre, OLED__PAGE4);
+  horizontal_scrolling(OLED__PAGE7);
 }
 /* -------------------------------------------------------------------------- */
 /*                      INTERRUPT SERVICE ROUTINE SECTION                     */
