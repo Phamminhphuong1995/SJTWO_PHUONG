@@ -17,6 +17,7 @@ typedef struct {
   char Title[30];
   char Artist[30];
   char Album[30];
+  char Year[4];
   uint8_t genre;
 } mp3_meta_data;
 /* -------------------------------------------------------------------------- */
@@ -103,8 +104,8 @@ int main() {
   xTaskCreate(reader_task, "reader", (2024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(player_task, "player", (3096 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, &player_handle);
   xTaskCreate(pause_task, "pause", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(previous_song_task, "get_song_name", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(next_song_task, "get_song_name", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(previous_song_task, "previous_song", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(next_song_task, "next_song", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   vTaskStartScheduler();
 }
 
@@ -142,11 +143,9 @@ void reader_task() {
       char byte_128[128];
       f_lseek(&file, f_size(&file) - (sizeof(char) * 128));
       f_read(&file, byte_128, sizeof(byte_128), &br);
-      fprintf(stderr, "Song name: %s\n", filename);
       read_meta(byte_128);
       f_lseek(&file, 0);
       /* ----------------------------- READ SONG_DATA ----------------------------- */
-
       if (FR_OK == result) {
         f_read(&file, byte_512, sizeof(byte_512), &br);
         while (br != 0) {
@@ -194,10 +193,8 @@ void next_song_task() {
         cursor_main = 0;
       }
       char *song = get_songs_name(cursor_main);
-      get_current_playing_song_name();
-      fprintf(stderr, "before next %d\n", cursor_main);
+      // get_current_playing_song_name();
       cursor_main++;
-      fprintf(stderr, "after next %d\n", cursor_main);
       xQueueSend(Q_trackname, song, portMAX_DELAY);
     }
   }
@@ -212,11 +209,9 @@ void previous_song_task() {
       if (cursor_main == 0) {
         cursor_main = total;
       }
-      fprintf(stderr, "before previous %d\n", cursor_main);
       cursor_main--;
-      fprintf(stderr, "after previous %d\n", cursor_main);
       char *song = get_songs_name(cursor_main);
-      get_current_playing_song_name();
+      // get_current_playing_song_name();
 
       xQueueSend(Q_trackname, song, portMAX_DELAY);
     }
@@ -245,8 +240,8 @@ void read_meta(char *byte_128) {
   white_Out(OLED__PAGE4, OLED_SINGLE_PAGE);
   white_Out(OLED__PAGE5, OLED_SINGLE_PAGE);
   white_Out(OLED__PAGE6, OLED_SINGLE_PAGE);
-  int meta_index = 0;
-  char meta_data[128] = {"0"};
+  // int meta_index = 0;
+  // char meta_data[128] = {"0"};
   mp3_meta_data meta_data_mp3 = {0};
   for (int i = 0; i < 128; i++) {
     if ((((int)(byte_128[i]) > 47) && ((int)(byte_128[i]) < 58)) ||
@@ -256,21 +251,26 @@ void read_meta(char *byte_128) {
       if (i < 3) {
         meta_data_mp3.Tag[i] = c;
       } else if (i > 2 && i < 33) {
-        meta_data_mp3.Artist[i - 3] = c;
+        meta_data_mp3.Title[i - 3] = c;
       } else if (i > 32 && i < 63) {
-        meta_data_mp3.Album[i - 33] = c;
+        meta_data_mp3.Artist[i - 33] = c;
+      } else if (i > 62 && i < 93) {
+        meta_data_mp3.Album[i - 63] = c;
+      } else if (i > 92 && i < 97) {
+        meta_data_mp3.Year[i - 93] = c;
       } else if (i == 127) {
         meta_data_mp3.genre = (int)(byte_128[i]);
       }
-      meta_data[meta_index] = c;
-      meta_index++;
+      // meta_data[meta_index] = c;
+      // meta_index++;
     }
   }
-  display_at_page(meta_data_mp3.Tag, OLED__PAGE1);
+  // display_at_page(meta_data_mp3.Tag, OLED__PAGE1);
+  display_at_page(meta_data_mp3.Title, OLED__PAGE1);
   display_at_page(meta_data_mp3.Artist, OLED__PAGE2);
-  display_at_page(meta_data_mp3.Album, OLED__PAGE3);
-  display_at_page(genre_decoder(meta_data_mp3.genre), OLED__PAGE4);
-  horizontal_scrolling(OLED__PAGE7);
+  display_at_page(genre_decoder(meta_data_mp3.genre), OLED__PAGE3);
+  display_at_page(meta_data_mp3.Year, OLED__PAGE4);
+  horizontal_scrolling(OLED__PAGE1);
 }
 /* -------------------------------------------------------------------------- */
 /*                      INTERRUPT SERVICE ROUTINE SECTION                     */

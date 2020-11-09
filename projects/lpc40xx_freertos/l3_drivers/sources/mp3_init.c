@@ -269,8 +269,16 @@ char *genre_decoder(uint8_t genre) {
   case 108:
   case 109:
   case 110:
-
+  case 111:
+  case 112:
+  case 113:
+  case 114:
+  case 115:
+  case 116:
+    ger = "Ballad";
+    break;
   default:
+    ger = "No Genre";
     break;
   }
   return ger;
