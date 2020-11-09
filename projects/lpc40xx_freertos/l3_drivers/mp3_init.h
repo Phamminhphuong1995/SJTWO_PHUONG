@@ -28,3 +28,5 @@ void set_Volume(uint16_t volume);
 void send_data_to_decoder(uint8_t data_byte);
 uint16_t mp3_read(uint8_t address);
 void mp3_write(uint8_t address_register, uint16_t high_low_byte_data);
+
+char *genre_decoder(uint8_t genre);

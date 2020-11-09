@@ -349,7 +349,6 @@ void display(char *str) {
     DC_toggle_data();
     for (int i = 0; i < strlen(str); i++) {
       if (str[i] == '\n') {
-        puts("checking new line\n");
         if (cursor1 == 7) {
           cursor1 = 0;
         }
@@ -481,7 +480,6 @@ void white_Out(oled_page page_number_oled, oled_white_out is_single_or_all) {
     SSP1__exchange_byte_lab(0x10);
     SSP1__exchange_byte_lab(0x00);
     if (is_single_or_all) {
-      puts("in all\n");
       set_page_start(0x00);
       // set_column_start(0x00);
       cs_oled();
@@ -497,7 +495,6 @@ void white_Out(oled_page page_number_oled, oled_white_out is_single_or_all) {
         SSP1__exchange_byte_lab(0x00);
       }
     } else {
-      puts("in single\n");
       set_page_start(page_number_oled);
       cs_oled();
       DC_toggle_data();

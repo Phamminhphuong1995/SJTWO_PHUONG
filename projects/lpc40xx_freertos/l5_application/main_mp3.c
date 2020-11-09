@@ -187,15 +187,18 @@ void player_task() {
 void next_song_task() {
   while (1) {
     if (xSemaphoreTake(next_song, portMAX_DELAY)) {
+      vTaskDelay(100);
       metamp3 = true;
       int total = total_of_songs();
-      if (cursor_main == total - 1) {
+      if (cursor_main == total) {
         cursor_main = 0;
       }
       char *song = get_songs_name(cursor_main);
       get_current_playing_song_name();
-      xQueueSend(Q_trackname, song, portMAX_DELAY);
+      fprintf(stderr, "before next %d\n", cursor_main);
       cursor_main++;
+      fprintf(stderr, "after next %d\n", cursor_main);
+      xQueueSend(Q_trackname, song, portMAX_DELAY);
     }
   }
 }
@@ -203,15 +206,19 @@ void next_song_task() {
 void previous_song_task() {
   while (1) {
     if (xSemaphoreTake(previous_song, portMAX_DELAY)) {
+      vTaskDelay(100);
       metamp3 = true;
       int total = total_of_songs();
       if (cursor_main == 0) {
-        cursor_main = total - 1;
+        cursor_main = total;
       }
+      fprintf(stderr, "before previous %d\n", cursor_main);
+      cursor_main--;
+      fprintf(stderr, "after previous %d\n", cursor_main);
       char *song = get_songs_name(cursor_main);
       get_current_playing_song_name();
+
       xQueueSend(Q_trackname, song, portMAX_DELAY);
-      cursor_main--;
     }
   }
 }
@@ -223,7 +230,8 @@ void previous_song_task() {
 void get_current_playing_song_name() {
   white_Out(OLED__PAGE7, OLED_SINGLE_PAGE);
   char *song = get_songs_name(cursor_main);
-  display_at_page(song, OLED__PAGE7);
+  song_name_without_dot_mp3 = remove_dot_mp3(song);
+  display_at_page(song_name_without_dot_mp3, OLED__PAGE7);
 }
 
 /**
@@ -261,7 +269,7 @@ void read_meta(char *byte_128) {
   display_at_page(meta_data_mp3.Tag, OLED__PAGE1);
   display_at_page(meta_data_mp3.Artist, OLED__PAGE2);
   display_at_page(meta_data_mp3.Album, OLED__PAGE3);
-  // display_at_page(meta_data_mp3.genre, OLED__PAGE4);
+  display_at_page(genre_decoder(meta_data_mp3.genre), OLED__PAGE4);
   horizontal_scrolling(OLED__PAGE7);
 }
 /* -------------------------------------------------------------------------- */
