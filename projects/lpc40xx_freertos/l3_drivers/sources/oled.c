@@ -343,9 +343,9 @@ void display(char *str) {
   cs_oled();
   {
     DC_toggle_command();
-    // SSP1__exchange_byte_lab(0xB0);
-    // SSP1__exchange_byte_lab(0x10);
-    // SSP1__exchange_byte_lab(0x00);
+    SSP1__exchange_byte_lab(0xB0);
+    SSP1__exchange_byte_lab(0x10);
+    SSP1__exchange_byte_lab(0x00);
     DC_toggle_data();
     for (int i = 0; i < strlen(str); i++) {
       if (str[i] == '\n') {

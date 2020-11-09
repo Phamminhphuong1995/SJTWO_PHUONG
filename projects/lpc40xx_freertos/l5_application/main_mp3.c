@@ -17,7 +17,10 @@
 /* -------------------------------------------------------------------------- */
 
 SemaphoreHandle_t pause_semaphore;
+SemaphoreHandle_t pause_semaphore_test;
 SemaphoreHandle_t next_song;
+SemaphoreHandle_t previous_song;
+SemaphoreHandle_t get_current_song_name;
 
 /* -------------------------------------------------------------------------- */
 /*                                QUEUE SECTION                               */
@@ -33,7 +36,11 @@ QueueHandle_t Q_songdata;
 void reader_task();
 void player_task();
 void pause_task();
+void pause_test();
 void get_current_playing_song_name();
+void next_song_task();
+void previous_song_task();
+void read_meta(char *byte_128);
 
 /* -------------------------------------------------------------------------- */
 /*                           GLOBAL VARIABLE SECTION                          */
@@ -42,6 +49,7 @@ void get_current_playing_song_name();
 volatile bool play_pause = true;
 uint16_t cursor_main = 0;
 char *song_name_without_dot_mp3;
+volatile bool metamp3 = true;
 
 /* -------------------------------------------------------------------------- */
 /*                     INTERRUPT SERVICE ROUNTINE SECTION                     */
@@ -62,7 +70,7 @@ int main() {
 
   /* ----------------------- utility and initialization ----------------------- */
   populate_list_song();
-  fprintf(stderr, "\ntotal song: %d", total_of_songs());
+  fprintf(stderr, "\ntotal song: %d\n", total_of_songs());
   mp3_init();
   turn_on_oled();
   clear();
@@ -75,6 +83,7 @@ int main() {
   Q_songdata = xQueueCreate(1, 512);
   pause_semaphore = xSemaphoreCreateBinary();
   next_song = xSemaphoreCreateBinary();
+  previous_song = xSemaphoreCreateBinary();
 
   /* -------------------------------- Interrupt ------------------------------- */
 
@@ -87,7 +96,8 @@ int main() {
   xTaskCreate(reader_task, "reader", (2024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(player_task, "player", (3096 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, &player_handle);
   xTaskCreate(pause_task, "pause", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(get_current_playing_song_name, "get_song_name", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(previous_song_task, "get_song_name", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(next_song_task, "get_song_name", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   vTaskStartScheduler();
 }
 
@@ -112,17 +122,21 @@ void pause_task() {
 void reader_task() {
   trackname_t song_name;
   uint8_t byte_512[512];
-  // binary
+  UINT br; // binary
   while (1) {
     if (xQueueReceive(Q_trackname, song_name, portMAX_DELAY)) {
       /* -------------------------------- OPEN FILE ------------------------------- */
-      UINT br;
       const char *filename = song_name;
-      fprintf(stderr, "Song name is: %s\n", filename);
       FIL file; // create object file
       FRESULT result = f_open(&file, filename, (FA_READ));
-      // fprintf(stderr, "Status of result and FROK %d  %d\n", result, FR_OK);
-      // fprintf(stderr, "BR is: %x\n", br);
+
+      /* ----------------------------- READ META_DATA ----------------------------- */
+      char byte_128[128];
+      f_read(&file, byte_128, sizeof(byte_128), &br); // for meta data
+      read_meta(byte_128);
+
+      /* ----------------------------- READ SONG_DATA ----------------------------- */
+
       if (FR_OK == result) {
         f_read(&file, byte_512, sizeof(byte_512), &br);
         while (br != 0) {
@@ -132,11 +146,10 @@ void reader_task() {
             printf("New play song request\n");
             break;
           }
-          // fprintf(stderr, "Does it play\n");
         }
-
         /* --------------------------- Auto play next song -------------------------- */
         if (br == 0) {
+          metamp3 = true; // read meta
           xSemaphoreGive(next_song);
         }
         f_close(&file);
@@ -161,32 +174,78 @@ void player_task() {
   }
 }
 
-void get_current_playing_song_name() {
+void next_song_task() {
   while (1) {
     if (xSemaphoreTake(next_song, portMAX_DELAY)) {
+      metamp3 = true;
       int total = total_of_songs();
-      if (cursor_main >= total) {
+      if (cursor_main == total - 1) {
         cursor_main = 0;
       }
-      // white_Out(OLED__PAGE1, OLED_SINGLE_PAGE);
-      // white_Out(OLED__PAGE0, OLED_SINGLE_PAGE);
-      white_Out(OLED__PAGE6, OLED_ALL_PAGES);
       char *song = get_songs_name(cursor_main);
+      get_current_playing_song_name();
       xQueueSend(Q_trackname, song, portMAX_DELAY);
-      display("Playing: ");
-      song_name_without_dot_mp3 = remove_dot_mp3(song);
-      display(song);
-      // display_at_page(song_name_without_dot_mp3, OLED__PAGE5);
-      // horizontal_scrolling(OLED__PAGE1);
-      // white_Out(OLED__PAGE6, OLED_ALL_PAGES);
       cursor_main++;
     }
   }
 }
 
+void previous_song_task() {
+  while (1) {
+    if (xSemaphoreTake(previous_song, portMAX_DELAY)) {
+      metamp3 = true;
+      int total = total_of_songs();
+      if (cursor_main == 0) {
+        cursor_main = total - 1;
+      }
+      char *song = get_songs_name(cursor_main);
+      get_current_playing_song_name();
+      xQueueSend(Q_trackname, song, portMAX_DELAY);
+      cursor_main--;
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                UTILITY TASK                                */
+/* -------------------------------------------------------------------------- */
+
+void get_current_playing_song_name() {
+  white_Out(OLED__PAGE7, OLED_SINGLE_PAGE);
+  char *song = get_songs_name(cursor_main);
+  display_at_page(song, OLED__PAGE7);
+}
+
+void read_meta(char *byte_128) {
+  white_Out(OLED__PAGE0, OLED_SINGLE_PAGE);
+  white_Out(OLED__PAGE1, OLED_SINGLE_PAGE);
+  white_Out(OLED__PAGE2, OLED_SINGLE_PAGE);
+  white_Out(OLED__PAGE3, OLED_SINGLE_PAGE);
+  white_Out(OLED__PAGE4, OLED_SINGLE_PAGE);
+  white_Out(OLED__PAGE5, OLED_SINGLE_PAGE);
+  white_Out(OLED__PAGE6, OLED_SINGLE_PAGE);
+  int meta_index = 0;
+  char meta_data[128] = {"0"};
+  if (metamp3) {
+    for (int i = 0; i < 128; i++) {
+      if (i > 20) {
+        if ((((int)(byte_128[i]) > 47) && ((int)(byte_128[i]) < 58)) ||
+            (((int)(byte_128[i]) > 64) && ((int)(byte_128[i]) < 91)) ||
+            (((int)(byte_128[i]) > 96) && ((int)(byte_128[i]) < 123))) {
+          char c = (int)(byte_128[i]);
+          meta_data[meta_index] = c;
+          meta_index++;
+        }
+      }
+    }
+    display(meta_data);
+    horizontal_scrolling(OLED__PAGE7);
+  }
+  metamp3 = false;
+}
 /* -------------------------------------------------------------------------- */
 /*                      INTERRUPT SERVICE ROUTINE SECTION                     */
 /* -------------------------------------------------------------------------- */
 
-void pause_isr() { xSemaphoreGiveFromISR(pause_semaphore, NULL); }
+void pause_isr() { xSemaphoreGiveFromISR(previous_song, NULL); }
 void next_song_isr() { xSemaphoreGiveFromISR(next_song, NULL); }
