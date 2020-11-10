@@ -306,8 +306,8 @@ void horizontal_scrolling(oled_page page_number_oled) {
 void new_line(oled_page page_number_oled) {
   DC_toggle_command();
   SSP1__exchange_byte_lab(0xB0 | page_number_oled);
-  SSP1__exchange_byte_lab(0x10);
   SSP1__exchange_byte_lab(0x00);
+  SSP1__exchange_byte_lab(0x10);
   DC_toggle_data();
 }
 
@@ -335,6 +335,7 @@ void display_at_page(char *str, oled_page page_number_oled) {
       function_pointer_oled oled_handler = oled_callbacksR[(int)(str[i])];
       oled_handler();
     }
+    cursor = 0;
   }
   ds_oled();
 }

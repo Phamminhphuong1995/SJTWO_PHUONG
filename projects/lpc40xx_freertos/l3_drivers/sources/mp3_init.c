@@ -102,9 +102,7 @@ char *remove_dot_mp3(char *current_song) {
   trackname_t song_name_copy;
   char *copy_song;
   copy_song = song_name_copy;
-  //   display(song_name_copy);
   strcpy(song_name_copy, current_song);
-  //   display(song_name_copy);
   copy_song = strtok(song_name_copy, ".");
   return copy_song;
 }

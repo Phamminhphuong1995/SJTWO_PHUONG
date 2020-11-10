@@ -1,5 +1,6 @@
 #include "FreeRTOS.h"
 #include "cli_handlers.h"
+#include "decoder.h"
 #include "ff.h"
 #include "gpio_isr.h"
 #include "gpio_lab.h"
@@ -79,7 +80,7 @@ int main() {
   /* ----------------------- utility and initialization ----------------------- */
   populate_list_song();
   fprintf(stderr, "\ntotal song: %d\n", total_of_songs());
-  mp3_init();
+  decoder_setup();
   turn_on_oled();
   clear();
   update();
@@ -172,13 +173,12 @@ void reader_task() {
 void player_task() {
   while (1) {
     uint8_t byte_512[512];
-    if (xQueueReceive(Q_songdata, byte_512, portMAX_DELAY)) {
-      for (int i = 0; i < 512; i++) {
-        while (!GPIO__get_level(2, 0)) {
-          vTaskDelay(1); // waiting for DREQ
-        }
-        send_data_to_decoder(byte_512[i]);
+    xQueueReceive(Q_songdata, byte_512, portMAX_DELAY);
+    for (int i = 0; i < 512; i++) {
+      while (!get_DREQ_HighActive()) {
+        vTaskDelay(1); // waiting for DREQ
       }
+      decoder_send_mp3Data(byte_512[i]);
     }
   }
 }
@@ -197,6 +197,7 @@ void next_song_task() {
       cursor_main++;
       xQueueSend(Q_trackname, song, portMAX_DELAY);
     }
+    vTaskDelay(50);
   }
 }
 
@@ -215,6 +216,7 @@ void previous_song_task() {
 
       xQueueSend(Q_trackname, song, portMAX_DELAY);
     }
+    vTaskDelay(50);
   }
 }
 
@@ -233,15 +235,7 @@ void get_current_playing_song_name() {
  * FIXME
  */
 void read_meta(char *byte_128) {
-  white_Out(OLED__PAGE0, OLED_SINGLE_PAGE);
-  white_Out(OLED__PAGE1, OLED_SINGLE_PAGE);
-  white_Out(OLED__PAGE2, OLED_SINGLE_PAGE);
-  white_Out(OLED__PAGE3, OLED_SINGLE_PAGE);
-  white_Out(OLED__PAGE4, OLED_SINGLE_PAGE);
-  white_Out(OLED__PAGE5, OLED_SINGLE_PAGE);
-  white_Out(OLED__PAGE6, OLED_SINGLE_PAGE);
-  // int meta_index = 0;
-  // char meta_data[128] = {"0"};
+  white_Out(OLED__PAGE0, OLED_ALL_PAGES);
   mp3_meta_data meta_data_mp3 = {0};
   for (int i = 0; i < 128; i++) {
     if ((((int)(byte_128[i]) > 47) && ((int)(byte_128[i]) < 58)) ||
@@ -261,11 +255,8 @@ void read_meta(char *byte_128) {
       } else if (i == 127) {
         meta_data_mp3.genre = (int)(byte_128[i]);
       }
-      // meta_data[meta_index] = c;
-      // meta_index++;
     }
   }
-  // display_at_page(meta_data_mp3.Tag, OLED__PAGE1);
   display_at_page(meta_data_mp3.Title, OLED__PAGE1);
   display_at_page(meta_data_mp3.Artist, OLED__PAGE2);
   display_at_page(genre_decoder(meta_data_mp3.genre), OLED__PAGE3);
