@@ -80,7 +80,7 @@ int main() {
   /* ----------------------- utility and initialization ----------------------- */
   populate_list_song();
   fprintf(stderr, "\ntotal song: %d\n", total_of_songs());
-  decoder_setup();
+  mp3_init();
   turn_on_oled();
   clear();
   update();
@@ -197,7 +197,7 @@ void next_song_task() {
       cursor_main++;
       xQueueSend(Q_trackname, song, portMAX_DELAY);
     }
-    vTaskDelay(50);
+    vTaskDelay(100);
   }
 }
 
@@ -216,7 +216,7 @@ void previous_song_task() {
 
       xQueueSend(Q_trackname, song, portMAX_DELAY);
     }
-    vTaskDelay(50);
+    vTaskDelay(100);
   }
 }
 

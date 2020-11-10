@@ -102,7 +102,9 @@ char *remove_dot_mp3(char *current_song) {
   trackname_t song_name_copy;
   char *copy_song;
   copy_song = song_name_copy;
+  //   display(song_name_copy);
   strcpy(song_name_copy, current_song);
+  //   display(song_name_copy);
   copy_song = strtok(song_name_copy, ".");
   return copy_song;
 }
@@ -143,7 +145,7 @@ void mp3_init() {
   /* -------------------------------------------------------------------------- */
 
   /* ------------------- Setting the decoder to run at 4Mhz ------------------- */
-  decoder_clock(4000);
+  decoder_clock(4000000);
   uint16_t MP3_CLK_3 = mp3_read(SCI_CLOCKF);
   printf("SCK_3: %x\n", MP3_CLK_3);
 }
