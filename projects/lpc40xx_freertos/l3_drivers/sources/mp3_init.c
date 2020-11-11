@@ -1,5 +1,5 @@
 #include "mp3_init.h"
-
+uint16_t VOLUME[10] = {0X7D7D, 0X6464, 0x4B4B, 0x3C3C, 0x3535, 0x3030, 0x2525, 0x2020, 0x1515};
 void mp3_configured_pin() {
   /* -------------------------------------------------------------------------- */
   /*                        INITALIZE PIN FOR SPI DECODER                       */
@@ -70,7 +70,8 @@ uint16_t mp3_read(uint8_t address) {
   return data;
 }
 
-void set_Volume(uint16_t volume) { mp3_write(SCI_VOL, volume); }
+static void set_Volume_helper(uint16_t volume) { mp3_write(SCI_VOL, volume); }
+void set_Volume(uint16_t volume) { set_Volume_helper(VOLUME[volume]); }
 void mp3_write(uint8_t address_register, uint16_t high_low_byte_data) {
   while (!GPIO__get_level(2, 0)) {
     ; // waiting for DREQ
@@ -120,7 +121,7 @@ void mp3_init() {
   ssp0__exchange_byte_lab(0xFF);
   ds_decoder();
   xdcs_decoder_high();
-  set_Volume(0x2525);
+  set_Volume_helper(0x3535);
 
   /* -------------------------------------------------------------------------- */
   /*                      TESTING FOR THE STATE OF DECODER                      */

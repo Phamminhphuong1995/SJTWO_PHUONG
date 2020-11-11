@@ -22,14 +22,13 @@ void populate_list_song() {
 
   if (res == FR_OK) {
     for (;;) {
-      res = f_readdir(&dir, &file_info); /* Read a directory item */
+      res = f_readdir(&dir, &file_info);
       if (res != FR_OK || file_info.fname[0] == 0) {
-        break; /* Break on error or end of dir */
+        break;
       }
 
       if (file_info.fattrib & AM_DIR) {
-        /* Skip nested directories, only focus on MP3 songs at the root */
-      } else { /* It is a file. */
+      } else {
         song_list__handle_filename(file_info.fname);
       }
     }

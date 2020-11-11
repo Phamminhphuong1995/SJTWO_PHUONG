@@ -303,6 +303,15 @@ void horizontal_scrolling(oled_page page_number_oled) {
   ds_oled();
 }
 
+void deactivate_horizontal_scrolling() {
+  cs_oled();
+  {
+    DC_toggle_command();
+    SSP1__exchange_byte_lab(0x2E);
+  }
+  ds_oled();
+}
+
 void new_line(oled_page page_number_oled) {
   DC_toggle_command();
   SSP1__exchange_byte_lab(0xB0 | page_number_oled);
@@ -344,9 +353,9 @@ void display(char *str) {
   cs_oled();
   {
     DC_toggle_command();
-    SSP1__exchange_byte_lab(0xB0);
-    SSP1__exchange_byte_lab(0x10);
-    SSP1__exchange_byte_lab(0x00);
+    // SSP1__exchange_byte_lab(0xB0);
+    // SSP1__exchange_byte_lab(0x10);
+    // SSP1__exchange_byte_lab(0x00);
     DC_toggle_data();
     for (int i = 0; i < strlen(str); i++) {
       if (str[i] == '\n') {

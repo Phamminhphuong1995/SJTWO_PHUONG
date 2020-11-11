@@ -1,3 +1,4 @@
+#pragma once
 #include "cli_handlers.h"
 #include "gpio.h"
 #include "gpio_lab.h"
@@ -11,6 +12,7 @@
 #define SCI_BASS 0x02
 #define SCI_CLOCKF 0x03
 #define SCI_VOL 0x0B
+
 void mp3_init();
 char *remove_dot_mp3(char *current_song);
 void mp3_configured_pin();
@@ -25,6 +27,7 @@ void ds_decoder();
 void cs_decoder();
 
 void set_Volume(uint16_t volume);
+
 void send_data_to_decoder(uint8_t data_byte);
 uint16_t mp3_read(uint8_t address);
 void mp3_write(uint8_t address_register, uint16_t high_low_byte_data);

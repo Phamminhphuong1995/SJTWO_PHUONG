@@ -57,6 +57,7 @@ void horizotal_addr_mode();
 void page_addressing_mode();
 void page_1_mode();
 void horizontal_scrolling(oled_page page_number_oled);
+void deactivate_horizontal_scrolling();
 void set_page_start(oled_page page_number_oled);
 void set_column_start(oled_column column_number);
 
