@@ -1,5 +1,5 @@
 #include "mp3_init.h"
-uint16_t VOLUME[10] = {0X7D7D, 0X6464, 0x4B4B, 0x3C3C, 0x3535, 0x3030, 0x2525, 0x2020, 0x1515};
+const uint16_t VOLUME[10] = {0X7D7D, 0X6464, 0x4B4B, 0x3C3C, 0x3535, 0x3030, 0x2525, 0x2020, 0x1515};
 void mp3_configured_pin() {
   /* -------------------------------------------------------------------------- */
   /*                        INITALIZE PIN FOR SPI DECODER                       */
