@@ -348,6 +348,15 @@ void display_at_page(char *str, oled_page page_number_oled) {
   }
   ds_oled();
 }
+void invert_at_page(oled_page page_number_oled) {
+  cs_oled();
+  {
+    DC_toggle_command();
+    SSP1__exchange_byte_lab(0xB0 | page_number_oled);
+    SSP1__exchange_byte_lab(0xA7);
+  }
+  ds_oled();
+}
 uint8_t cursor1;
 void display(char *str) {
   cs_oled();

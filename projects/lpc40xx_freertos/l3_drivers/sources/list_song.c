@@ -3,6 +3,7 @@
 typedef char song_storage_location[128];
 
 static song_storage_location list_song[32];
+static song_storage_location list_song_without_mp3[32];
 static uint16_t total_song;
 
 static void song_list__handle_filename(const char *filename) {
@@ -46,4 +47,9 @@ char *get_songs_name(uint16_t index) {
     song_name = list_song[index];
   }
   return song_name;
+}
+
+char *get_songs_name_no_mp3() {
+  char *song_name_no_mp3 = list_song_without_mp3;
+  return song_name_no_mp3;
 }

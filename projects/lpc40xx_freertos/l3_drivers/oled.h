@@ -62,6 +62,7 @@ void set_page_start(oled_page page_number_oled);
 void set_column_start(oled_column column_number);
 
 void display_at_page(char *str, oled_page page_number_oled);
+void invert_at_page(oled_page page_number_oled);
 void display(char *str);
 void set_up_char_array();
 
