@@ -101,10 +101,9 @@ int main() {
   turn_on_oled();
   clear();
   update();
-  sj2_cli__init();
   populate_song_no_mp3();
   display_list_of_song();
-  delay__ms(2000);
+  sj2_cli__init();
 
   /* --------------------------- Queue and Semaphore -------------------------- */
 
@@ -345,7 +344,6 @@ void get_current_playing_song_name() {
  * FIXME
  */
 void read_meta(char *byte_128) {
-
   white_Out(OLED__PAGE1, OLED_SINGLE_PAGE);
   white_Out(OLED__PAGE2, OLED_SINGLE_PAGE);
   white_Out(OLED__PAGE3, OLED_SINGLE_PAGE);
@@ -393,16 +391,13 @@ void display_list_of_song() {
   uint8_t oled_page_counter = 0;
   for (int i = cursor_main; i < cursor_main + 8; i++) {
     if (i == total_of_songs()) {
-      fprintf(stderr, "i: %d\n", i);
       break;
     }
-    fprintf(stderr, "i: %d\n", i);
     char *song = list_song_without_mp3[i];
     // song_name_without_dot_mp3 = remove_dot_mp3(song);
     display_at_page(song, oled_page_counter);
     oled_page_counter++;
   }
-  fprintf(stderr, "Cursor_main: %d\n", cursor_main);
 }
 
 void populate_song_no_mp3() {

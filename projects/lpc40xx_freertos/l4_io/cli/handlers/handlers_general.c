@@ -113,14 +113,14 @@ static void cli__task_list_print(sl_string_t output_string, app_cli__print_strin
   static const char *const task_status_table[] = {"running", " ready ", "blocked", "suspend", "deleted"};
 
   // Limit the tasks to avoid heap allocation.
-  const unsigned portBASE_TYPE max_tasks = 10;
+  const unsigned portBASE_TYPE max_tasks = 15;
   TaskStatus_t status[max_tasks];
   uint32_t total_cpu_runtime = 0;
   uint32_t total_tasks_runtime = 0;
 
   const uint32_t total_run_time = portGET_RUN_TIME_COUNTER_VALUE();
   const unsigned portBASE_TYPE task_count = uxTaskGetSystemState(&status[0], max_tasks, &total_cpu_runtime);
-
+  fprintf(stderr, "task_count: %d\n", task_count);
   sl_string__printf(output_string, "%10s  Status Pr Stack CPU%%          Time\n", "Name");
   cli_output(unused_cli_param, output_string);
 

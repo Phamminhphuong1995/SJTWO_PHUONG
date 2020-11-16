@@ -50,7 +50,7 @@ uint16_t mp3_read(uint8_t address) {
   uint16_t data1;
   uint16_t data2;
   cs_decoder();
-  xdcs_decoder_low();
+  // xdcs_decoder_low();
   {
     ssp0__exchange_byte_lab(0x03); // sending opcode for read
     ssp0__exchange_byte_lab(address);
@@ -63,7 +63,7 @@ uint16_t mp3_read(uint8_t address) {
       ; // waiting for DREQ
     }
   }
-  xdcs_decoder_high();
+  // xdcs_decoder_high();
   ds_decoder();
   uint16_t data = data1 << 8;
   data |= data2;
@@ -77,7 +77,7 @@ void mp3_write(uint8_t address_register, uint16_t high_low_byte_data) {
     ; // waiting for DREQ
   }
   cs_decoder();
-  xdcs_decoder_low();
+  // xdcs_decoder_low();
   {
     ssp0__exchange_byte_lab(0x02); // opcode for write operation
     ssp0__exchange_byte_lab(address_register);
@@ -86,7 +86,7 @@ void mp3_write(uint8_t address_register, uint16_t high_low_byte_data) {
       ; // waiting for DREQ
     }
   }
-  xdcs_decoder_high();
+  // xdcs_decoder_high();
   ds_decoder();
 }
 
