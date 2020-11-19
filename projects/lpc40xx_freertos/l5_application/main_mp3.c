@@ -11,8 +11,9 @@
 #include "queue.h"
 #include "sj2_cli.h"
 #include "task.h"
+#include <stdlib.h>
 #include <string.h>
-
+#include <time.h>
 typedef struct {
   char Tag[3];
   char Title[30];
@@ -29,9 +30,9 @@ SemaphoreHandle_t pause_semaphore;
 SemaphoreHandle_t next_song;
 SemaphoreHandle_t previous_song;
 SemaphoreHandle_t get_current_song_name;
-SemaphoreHandle_t volume_up;
+SemaphoreHandle_t playlist;
 SemaphoreHandle_t volume_down;
-SemaphoreHandle_t move_up;
+SemaphoreHandle_t main_menu;
 SemaphoreHandle_t move_down;
 
 /* -------------------------------------------------------------------------- */
@@ -49,17 +50,28 @@ void reader_task();
 void player_task();
 void pause_task();
 void pause_test();
-void get_current_playing_song_name();
 void next_song_task();
 void previous_song_task();
-void read_meta(char *byte_128);
+void playlist_control_task();
+void menu_control_task();
+
 void volume_up_task();
 void volume_down_task();
+void play_list_display_task();
+/* -------------------------------------------------------------------------- */
+/*                              UTILITY FUNCTION SECTION                      */
+/* -------------------------------------------------------------------------- */
+
 void display_current_volume();
 void display_list_of_song();
-void move_down_task();
+void menu();
 void clear_number_of_page(uint8_t number_of_page);
 void populate_song_no_mp3();
+void clear_cursor_and_screen();
+void read_meta(char *byte_128);
+void get_current_playing_song_name();
+void debounce_reduce(uint8_t port, uint8_t pin);
+void loading_screen();
 
 /* -------------------------------------------------------------------------- */
 /*                           GLOBAL VARIABLE SECTION                          */
@@ -71,20 +83,23 @@ char *song_name_without_dot_mp3;
 volatile bool metamp3 = true;
 volatile uint8_t volume_level = 4;
 char list_song_without_mp3[32][128];
-
+uint8_t cursor_menu = 0;
+volatile bool menu_switch = true;
 /* -------------------------------------------------------------------------- */
 /*                     INTERRUPT SERVICE ROUNTINE SECTION                     */
 /* -------------------------------------------------------------------------- */
 
 void pause_isr(void);
 void next_song_isr(void);
-void volume_control_isr(void);
-void move_down_isr(void);
+void menu_control_task_isr(void);
+void playlist_control_task_isr(void);
+void menu_control_task_isr(void);
 /* -------------------------------------------------------------------------- */
 /*                             TASKHANDLE SECTION                             */
 /* -------------------------------------------------------------------------- */
 
 TaskHandle_t player_handle;
+TaskHandle_t playlist_control_task_handle;
 
 /* ---------------------------------- MAIN ---------------------------------- */
 
@@ -102,7 +117,9 @@ int main() {
   clear();
   update();
   populate_song_no_mp3();
-  display_list_of_song();
+  loading_screen();
+  // display_list_of_song();
+  menu();
   sj2_cli__init();
 
   /* --------------------------- Queue and Semaphore -------------------------- */
@@ -112,29 +129,35 @@ int main() {
   pause_semaphore = xSemaphoreCreateBinary();
   next_song = xSemaphoreCreateBinary();
   previous_song = xSemaphoreCreateBinary();
-  volume_up = xSemaphoreCreateBinary();
-  volume_down = xSemaphoreCreateBinary();
-  move_up = xSemaphoreCreateBinary();
+  main_menu = xSemaphoreCreateBinary();
   move_down = xSemaphoreCreateBinary();
+  playlist = xSemaphoreCreateBinary();
 
   /* -------------------------------- Interrupt ------------------------------- */
 
   lpc_peripheral__enable_interrupt(LPC_PERIPHERAL__GPIO, gpio0__interrupt_dispatcher, "isr for port 0");
   gpio0__attach_interrupt(30, GPIO_INTR__FALLING_EDGE, pause_isr);
-  gpio0__attach_interrupt(29, GPIO_INTR__FALLING_EDGE, next_song_isr);
-  gpio0__attach_interrupt(6, GPIO_INTR__FALLING_EDGE, volume_control_isr);
-  gpio0__attach_interrupt(8, GPIO_INTR__FALLING_EDGE, move_down_isr);
+  gpio0__attach_interrupt(29, GPIO_INTR__FALLING_EDGE, menu_control_task_isr);
+  gpio0__attach_interrupt(6, GPIO_INTR__FALLING_EDGE, next_song_isr);
+  gpio0__attach_interrupt(8, GPIO_INTR__FALLING_EDGE, playlist_control_task_isr);
 
   /* ------------------------------ Task creation ----------------------------- */
 
   xTaskCreate(reader_task, "reader", (2024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(player_task, "player", (3096 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, &player_handle);
   xTaskCreate(pause_task, "pause", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+
   xTaskCreate(previous_song_task, "previous_song", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
   xTaskCreate(next_song_task, "next_song", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(volume_up_task, "volume up", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(volume_down_task, "volume down", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(move_down_task, "move down", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(playlist_control_task, "playlist_control", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM,
+              &playlist_control_task_handle);
+
+  xTaskCreate(menu_control_task, "menu", (1024 * 2) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(volume_up_task, "volume up", (1024) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  xTaskCreate(volume_down_task, "volume down", (1024) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+
+  xTaskCreate(play_list_display_task, "display playlist", (1024) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
+  // vTaskSuspend(playlist_control_task_handle);
   vTaskStartScheduler();
 }
 
@@ -163,8 +186,6 @@ void pause_task() {
 }
 
 void reader_task() {
-  // we dont need it yet or ??? will see
-  // display_current_volume();
   trackname_t song_name;
   uint8_t byte_512[512];
   UINT br; // binary
@@ -178,7 +199,6 @@ void reader_task() {
       FRESULT result = f_open(&file, filename, (FA_READ));
 
       /* ----------------------------- READ META_DATA ----------------------------- */
-      // FIXME
       char byte_128[128];
       f_lseek(&file, f_size(&file) - (sizeof(char) * 128));
       f_read(&file, byte_128, sizeof(byte_128), &br);
@@ -213,17 +233,18 @@ void player_task() {
     uint8_t byte_512[512];
     xQueueReceive(Q_songdata, byte_512, portMAX_DELAY);
     for (int i = 0; i < 512; i++) {
-      while (!get_DREQ_HighActive()) {
+      while (!GPIO__get_level(2, 0)) {
         vTaskDelay(1); // waiting for DREQ
       }
-      decoder_send_mp3Data(byte_512[i]);
+      send_data_to_decoder(byte_512[i]);
     }
   }
 }
-volatile bool debounce = true;
+
 void next_song_task() {
   while (1) {
     if (xSemaphoreTake(next_song, portMAX_DELAY)) {
+      vTaskResume(player_handle);
       if (!GPIO__get_level(1, 15)) {
         metamp3 = true;
         int total = total_of_songs();
@@ -241,7 +262,7 @@ void next_song_task() {
         display_at_page("Playing...", OLED__PAGE0);
         xSemaphoreGive(previous_song);
       }
-      vTaskDelay(1000);
+      vTaskDelay(100);
     }
   }
 }
@@ -249,6 +270,7 @@ void next_song_task() {
 void previous_song_task() {
   while (1) {
     if (xSemaphoreTake(previous_song, portMAX_DELAY)) {
+      vTaskResume(player_handle);
       metamp3 = true;
       int total = total_of_songs();
       if (cursor_main == 0) {
@@ -258,7 +280,6 @@ void previous_song_task() {
       char *song = get_songs_name(cursor_main);
       white_Out(OLED__PAGE0, OLED_SINGLE_PAGE);
       display_at_page("Playing...", OLED__PAGE0);
-
       xQueueSend(Q_trackname, song, portMAX_DELAY);
     }
     vTaskDelay(100);
@@ -267,25 +288,22 @@ void previous_song_task() {
 
 void volume_up_task() {
   while (1) {
-    if (xSemaphoreTake(volume_up, portMAX_DELAY)) {
-      if (!GPIO__get_level(1, 15)) {
-        volume_level++;
-        if (volume_level == 10) {
-          volume_level = 0;
-        }
-        set_Volume(volume_level);
-        display_current_volume();
-        horizontal_scrolling(OLED__PAGE1);
-      } else {
-        xSemaphoreGive(volume_down);
+    if (GPIO__get_level(1, 15)) {
+      if (volume_level == 10) {
+        volume_level = 0;
       }
+      volume_level++;
+      set_Volume(volume_level);
+      display_current_volume();
+      horizontal_scrolling(OLED__PAGE1);
     }
+    vTaskDelay(750);
   }
 }
 
 void volume_down_task() {
   while (1) {
-    if (xSemaphoreTake(volume_down, portMAX_DELAY)) {
+    if (GPIO__get_level(1, 19)) {
       volume_level--;
       if (volume_level == 0) {
         volume_level = 9;
@@ -294,38 +312,79 @@ void volume_down_task() {
       display_current_volume();
       horizontal_scrolling(OLED__PAGE1);
     }
+    vTaskDelay(750);
   }
 }
 
 uint8_t cursor_for_scrolling = 0;
-void move_down_task() {
+void playlist_control_task() {
+  srand(time(0));
   while (1) {
     if (xSemaphoreTake(move_down, portMAX_DELAY)) {
-      if (cursor_for_scrolling == 8) {
-        cursor_for_scrolling = 0;
-        white_Out(0, OLED_ALL_PAGES);
-        display_list_of_song();
+      if (menu_switch) {
+        if (cursor_menu > 2) {
+          cursor_menu = 0;
+        }
+        horizontal_scrolling(cursor_menu);
+        if (GPIO__get_level(1, 19) && (cursor_menu - 1) == 0) {
+          white_Out(0, OLED_ALL_PAGES);
+          display_list_of_song();
+          menu_switch = false;
+        }
+        if (GPIO__get_level(1, 19) && (cursor_menu) == 2) {
+          uint8_t rand_number;
+          white_Out(0, OLED_ALL_PAGES);
+          rand_number = rand() % total_of_songs();
+          cursor_main = cursor_main + rand_number / 3;
+          xSemaphoreGive(next_song);
+          menu_switch = false;
+        }
+        cursor_menu++;
+      } else {
+        if (cursor_for_scrolling == 8) {
+          cursor_for_scrolling = 0;
+          white_Out(0, OLED_ALL_PAGES);
+          display_list_of_song();
+        }
+        if (cursor_main == total_of_songs()) {
+          clear_cursor_and_screen();
+        }
+        horizontal_scrolling(cursor_for_scrolling);
+        if (GPIO__get_level(1, 19)) {
+          /**
+           * cause this cursor will be move down again when we press the button combination
+           * a hacky way is to deduct by 1 to move back to our intended location
+           * */
+          cursor_main--;
+          char *song = get_songs_name(cursor_main);
+          xQueueSend(Q_trackname, song, portMAX_DELAY);
+        }
+        if (GPIO__get_level(1, 15)) {
+          clear_cursor_and_screen();
+        }
+        /* -------------------------------------------------------------------------- */
+        cursor_for_scrolling++;
+        cursor_main++;
       }
-      horizontal_scrolling(cursor_for_scrolling);
-      if (GPIO__get_level(1, 19)) {
-        /**
-         * cause this cursor will be move down again when we press the button combination
-         * a hacky way is to deduct by 1 to move back to our intended location
-         * */
-        // cursor_main--;
-        char *song = get_songs_name(cursor_main - 1);
-        // cursor_main = cursor_for_scrolling;
-        xQueueSend(Q_trackname, song, portMAX_DELAY);
-      }
-      if (GPIO__get_level(1, 15)) {
-        cursor_main = 0;
-        cursor_for_scrolling = 0;
-        clear_number_of_page(8);
-        display_list_of_song();
-      }
-      /* -------------------------------------------------------------------------- */
-      cursor_for_scrolling++;
-      cursor_main++;
+    }
+  }
+}
+
+void menu_control_task() {
+  while (1) {
+    if (xSemaphoreTake(main_menu, portMAX_DELAY)) {
+      white_Out(0, OLED_ALL_PAGES);
+      menu();
+      cursor_menu = 0;
+      menu_switch = true;
+    }
+  }
+}
+
+void play_list_display_task() {
+  while (1) {
+    if (xSemaphoreTake(playlist, portMAX_DELAY)) {
+      clear_cursor_and_screen();
     }
   }
 }
@@ -340,9 +399,6 @@ void get_current_playing_song_name() {
   display_at_page(song_name_without_dot_mp3, OLED__PAGE7);
 }
 
-/**
- * FIXME
- */
 void read_meta(char *byte_128) {
   white_Out(OLED__PAGE1, OLED_SINGLE_PAGE);
   white_Out(OLED__PAGE2, OLED_SINGLE_PAGE);
@@ -372,7 +428,13 @@ void read_meta(char *byte_128) {
       }
     }
   }
-  display_at_page(meta_data_mp3.Title, OLED__PAGE1);
+  if (strlen(meta_data_mp3.Title) < 1) {
+    char *song = get_songs_name(cursor_main - 1); // index go back by 1
+    song_name_without_dot_mp3 = remove_dot_mp3(song);
+    display_at_page(song_name_without_dot_mp3, OLED__PAGE1);
+  } else {
+    display_at_page(meta_data_mp3.Title, OLED__PAGE1);
+  }
   display_at_page(meta_data_mp3.Artist, OLED__PAGE2);
   display_at_page(genre_decoder(meta_data_mp3.genre), OLED__PAGE3);
   display_at_page(meta_data_mp3.Year, OLED__PAGE4);
@@ -394,7 +456,6 @@ void display_list_of_song() {
       break;
     }
     char *song = list_song_without_mp3[i];
-    // song_name_without_dot_mp3 = remove_dot_mp3(song);
     display_at_page(song, oled_page_counter);
     oled_page_counter++;
   }
@@ -413,11 +474,47 @@ void clear_number_of_page(uint8_t number_of_page) {
     white_Out(i, OLED_SINGLE_PAGE);
   }
 }
+
+void clear_cursor_and_screen() {
+  cursor_main = 0;
+  cursor_for_scrolling = 0;
+  clear_number_of_page(8);
+  display_list_of_song();
+}
+
+void menu() {
+  display_at_page("List song", OLED__PAGE0);
+  display_at_page("Random song", OLED__PAGE1);
+}
+
+void debounce_reduce(uint8_t port, uint8_t pin) {
+  uint8_t delay = 0;
+  while (GPIO__get_level(port, pin)) {
+    delay += 10;
+  }
+  while (!GPIO__get_level(port, pin) && (delay != 0)) {
+    delay--;
+  }
+}
+
+void loading_screen() {
+  display("Initializing....\n");
+  for (int i = 0; i < 10; i++) {
+    display("......");
+    delay__ms(100);
+  }
+  delay__ms(1000);
+  white_Out(0, OLED_ALL_PAGES);
+}
 /* -------------------------------------------------------------------------- */
 /*                      INTERRUPT SERVICE ROUTINE SECTION                     */
 /* -------------------------------------------------------------------------- */
 
 void pause_isr() { xSemaphoreGiveFromISR(pause_semaphore, NULL); }
 void next_song_isr() { xSemaphoreGiveFromISR(next_song, NULL); }
-void volume_control_isr() { xSemaphoreGiveFromISR(volume_up, NULL); }
-void move_down_isr() { xSemaphoreGiveFromISR(move_down, NULL); }
+void menu_control_task_isr() {
+  debounce_reduce(0, 29);
+  xSemaphoreGiveFromISR(main_menu, NULL);
+}
+void playlist_control_task_isr() { xSemaphoreGiveFromISR(move_down, NULL); }
+// void menu_control_task_isr() { xSemaphoreGiveFromISR(main_menu, NULL); }
