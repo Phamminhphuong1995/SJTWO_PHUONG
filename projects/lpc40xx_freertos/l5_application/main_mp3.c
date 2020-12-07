@@ -62,7 +62,7 @@ void menu_control_task();
 void volume_up_task();
 void volume_down_task();
 void play_list_display_task();
-void favorite_songs_list();
+void favorite_songs_list_task();
 void favorite_song_sender_task();
 /* -------------------------------------------------------------------------- */
 /*                              UTILITY FUNCTION SECTION                      */
@@ -80,25 +80,42 @@ void debounce_reduce(uint8_t port, uint8_t pin);
 void loading_screen();
 void menu_section_task();
 void play_list_navigation();
-void favorite_songs_list();
+void favorite_songs_list_task();
 void read_favorite();
 void display_favorite();
 void clear_favorite();
+
+/* -------------------------------------------------------------------------- */
+/*                          EXTERNAL FUNCTION SECTION                         */
+/* -------------------------------------------------------------------------- */
+char *get_menu_from_menu_array(uint8_t choice);
+void set_menu_array();
+void turn_off_annoy_4_red_leds();
+bool is_menu_pressed();
+void set_menu_signal(bool menu_setter);
+bool are_we_in_list_of_favorite();
+void set_list_favorite(bool favorite_setter);
+bool are_we_in_current_playing();
+void set_current_play_signal(bool current_play_setter);
 /* -------------------------------------------------------------------------- */
 /*                           GLOBAL VARIABLE SECTION                          */
 /* -------------------------------------------------------------------------- */
 
 volatile bool play_pause = true;
+bool is_clear = false;
 uint16_t cursor_main = 0;
 char *song_name_without_dot_mp3;
 volatile bool metamp3 = true;
 volatile uint8_t volume_level = 4;
 char list_song_without_mp3[32][128];
+// char menu_array[8][128];
 uint8_t cursor_menu = 0;
-volatile bool menu_switch = true;
+// volatile bool menu_switch = true;
 uint8_t favorite_counter = 0;
 uint8_t favorite_counter_token = 0;
-uint16_t favorite[8] = {0};
+uint16_t favorite[128] = {0};
+uint8_t cursor_for_scrolling = 0;
+uint8_t cursor_list_favorite = 0;
 /* -------------------------------------------------------------------------- */
 /*                     INTERRUPT SERVICE ROUNTINE SECTION                     */
 /* -------------------------------------------------------------------------- */
@@ -122,6 +139,7 @@ TaskHandle_t volume_down_handle;
 int main() {
 
   /* ----------------------- utility and initialization ----------------------- */
+  turn_off_annoy_4_red_leds();
   srand(time(0));
   populate_list_song();
   GPIO__set_as_input(1, 15);
@@ -136,8 +154,8 @@ int main() {
   populate_song_no_mp3();
   loading_screen();
   // display_list_of_song();
+  set_menu_array();
   menu();
-  fprintf(stderr, "Calling\n");
   // read_favorite();
   sj2_cli__init();
 
@@ -166,7 +184,8 @@ int main() {
   /* ------------------------------ Task creation ----------------------------- */
 
   xTaskCreate(reader_task, "reader", (2024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
-  xTaskCreate(favorite_songs_list, "favorite_songs_list", (2024 * 4) / sizeof(void *), NULL, PRIORITY_HIGH, NULL);
+  xTaskCreate(favorite_songs_list_task, "favorite_songs_list_task", (2024 * 4) / sizeof(void *), NULL, PRIORITY_HIGH,
+              NULL);
   xTaskCreate(player_task, "player", (3096 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, &player_handle);
   xTaskCreate(pause_task, "pause", (1024 * 4) / sizeof(void *), NULL, PRIORITY_MEDIUM, NULL);
 
@@ -195,7 +214,6 @@ void pause_task() {
     if (xSemaphoreTake(pause_semaphore, portMAX_DELAY)) {
       if (GPIO__get_level(1, 19)) {
         display_at_page("Loved", OLED__PAGE6);
-        // favorite_counter_token++;
         horizontal_scrolling(OLED__PAGE1);
         xSemaphoreGive(favorite_song_sender);
       } else {
@@ -216,7 +234,7 @@ void pause_task() {
     }
   }
 }
-
+char byte_128_backup[128];
 void reader_task() {
   trackname_t song_name;
   uint8_t byte_512[512];
@@ -234,6 +252,7 @@ void reader_task() {
       char byte_128[128];
       f_lseek(&file, f_size(&file) - (sizeof(char) * 128));
       f_read(&file, byte_128, sizeof(byte_128), &br);
+      strncpy(byte_128_backup, byte_128, 128);
       read_meta(byte_128);
       f_lseek(&file, 0);
       /* ----------------------------- READ SONG_DATA ----------------------------- */
@@ -355,16 +374,41 @@ void volume_down_task() {
   }
 }
 
-uint8_t cursor_for_scrolling = 0;
 void playlist_control_task() {
   while (1) {
     if (xSemaphoreTake(move_down, portMAX_DELAY)) {
-      if (menu_switch) {
-        if (cursor_menu > 4) {
+      if (is_menu_pressed()) {
+        if (cursor_menu > 5) {
           cursor_menu = 0;
+        }
+        if (cursor_menu != 0) {
+          white_Out(cursor_menu - 1, OLED_SINGLE_PAGE);
+          display_at_page(get_menu_from_menu_array(cursor_menu - 1), cursor_menu - 1);
         }
         horizontal_scrolling(cursor_menu);
         menu_section_task();
+      } else if (are_we_in_list_of_favorite()) {
+        if (cursor_list_favorite > favorite_counter_token) {
+          cursor_list_favorite = 0;
+        }
+        if (cursor_list_favorite != 0) {
+          white_Out(cursor_list_favorite - 1, OLED_SINGLE_PAGE);
+          display_at_page(list_song_without_mp3[favorite[cursor_list_favorite - 1]], cursor_list_favorite - 1);
+        }
+        horizontal_scrolling(cursor_list_favorite);
+        if (GPIO__get_level(1, 19)) {
+          char *song = get_songs_name(favorite[cursor_list_favorite - 1]);
+          vTaskResume(volume_down_handle);
+          vTaskResume(volume_up_handle);
+          xQueueSend(Q_trackname, song, portMAX_DELAY);
+        }
+        cursor_list_favorite++;
+        if (GPIO__get_level(1, 15)) {
+          vTaskSuspend(volume_up_handle);
+          vTaskSuspend(volume_down_handle);
+          white_Out(0, OLED_ALL_PAGES);
+          display_favorite();
+        }
       } else {
         if (cursor_for_scrolling == 8) {
           cursor_for_scrolling = 0;
@@ -385,7 +429,7 @@ void menu_control_task() {
       white_Out(0, OLED_ALL_PAGES);
       menu();
       cursor_menu = 0;
-      menu_switch = true;
+      set_menu_signal(true);
     }
   }
 }
@@ -394,6 +438,97 @@ void play_list_display_task() {
   while (1) {
     if (xSemaphoreTake(playlist, portMAX_DELAY)) {
       clear_cursor_and_screen();
+    }
+  }
+}
+
+void menu_section_task() {
+  if (GPIO__get_level(1, 19) && cursor_menu == 1) {
+    vTaskSuspend(volume_up_handle);
+    vTaskSuspend(volume_down_handle);
+    clear_cursor_and_screen();
+    display_list_of_song();
+    set_list_favorite(false);
+    set_menu_signal(false);
+  }
+  if (GPIO__get_level(1, 19) && cursor_menu == 2) {
+    int rand_number;
+    white_Out(0, OLED_ALL_PAGES);
+    rand_number = rand() % total_of_songs();
+    cursor_main = rand_number;
+    vTaskResume(volume_up_handle);
+    vTaskResume(volume_down_handle);
+    xSemaphoreGive(next_song);
+    set_menu_signal(false);
+    set_list_favorite(false);
+  }
+  // TODO: working on list of favorite songs
+  if (GPIO__get_level(1, 19) && cursor_menu == 3) {
+    vTaskSuspend(volume_up_handle);
+    vTaskSuspend(volume_down_handle);
+    white_Out(0, OLED_ALL_PAGES);
+    read_favorite();
+    display_favorite();
+    set_menu_signal(false);
+    set_list_favorite(true);
+  }
+  if (GPIO__get_level(1, 19) && cursor_menu == 4) {
+    vTaskSuspend(volume_up_handle);
+    vTaskSuspend(volume_down_handle);
+    white_Out(0, OLED_ALL_PAGES);
+    display("Clearing favorite");
+    clear_favorite();
+    set_menu_signal(false);
+    set_list_favorite(false);
+  }
+  if (GPIO__get_level(1, 19) && cursor_menu == 5) {
+    if (strlen(byte_128_backup) == 0) {
+      white_Out(0, OLED_ALL_PAGES);
+      display("Currently Not\nPlaying any song\nPress menu\nTo go back");
+    } else {
+      vTaskResume(volume_up_handle);
+      vTaskResume(volume_down_handle);
+      white_Out(OLED__PAGE0, OLED_SINGLE_PAGE);
+      display_at_page("Playing", OLED__PAGE0);
+      read_meta(byte_128_backup);
+    }
+    set_menu_signal(false);
+    set_list_favorite(false);
+  }
+  cursor_menu++;
+}
+
+void favorite_song_sender_task() {
+  uint16_t data;
+  while (1) {
+    if (xSemaphoreTake(favorite_song_sender, portMAX_DELAY)) {
+      data = cursor_main - 1;
+      xQueueSend(Q_song_favorite, &data, 0);
+    }
+  }
+}
+
+void favorite_songs_list_task() {
+  char string[8];
+  uint16_t index_song;
+  const char *filename = "favorite.txt";
+  FIL file; // File handle
+  UINT bytes_written = 0;
+  // FRESULT result = f_open(&file, filename, (FA_OPEN_APPEND | FA_WRITE | FA_READ));
+  while (1) {
+    if (xQueueReceive(Q_song_favorite, &index_song, portMAX_DELAY)) {
+      FRESULT result = f_open(&file, filename, (FA_OPEN_APPEND | FA_WRITE | FA_READ));
+      if (FR_OK == result) {
+        sprintf(string, "%d ", index_song);
+        if (FR_OK == f_write(&file, string, strlen(string), &bytes_written)) {
+        } else {
+          fprintf(stderr, "ERROR: Failed to write data to file\n");
+        }
+        f_sync(&file);
+        f_close(&file);
+      } else {
+        fprintf(stderr, "ERROR: Failed to open: %s\n", filename);
+      }
     }
   }
 }
@@ -494,59 +629,20 @@ void clear_cursor_and_screen() {
 }
 
 void menu() {
-  display_at_page("List song", OLED__PAGE0);
-  display_at_page("Random song", OLED__PAGE1);
-  display_at_page("Favorite songs", OLED__PAGE2);
-  display_at_page("Clean Fav", OLED__PAGE3);
+  display_at_page(get_menu_from_menu_array(0), OLED__PAGE0);
+  display_at_page(get_menu_from_menu_array(1), OLED__PAGE1);
+  display_at_page(get_menu_from_menu_array(2), OLED__PAGE2);
+  display_at_page(get_menu_from_menu_array(3), OLED__PAGE3);
+  display_at_page(get_menu_from_menu_array(4), OLED__PAGE4);
 }
-
-void menu_section_task() {
-  if (GPIO__get_level(1, 19) && cursor_menu == 1) {
-    vTaskSuspend(volume_up_handle);
-    vTaskSuspend(volume_down_handle);
-    clear_cursor_and_screen();
-    display_list_of_song();
-    menu_switch = false;
-  }
-  if (GPIO__get_level(1, 19) && cursor_menu == 2) {
-    int rand_number;
-    white_Out(0, OLED_ALL_PAGES);
-    rand_number = rand() % total_of_songs();
-    cursor_main = rand_number;
-    vTaskResume(volume_up_handle);
-    vTaskResume(volume_down_handle);
-    xSemaphoreGive(next_song);
-    menu_switch = false;
-  }
-  // TODO: working on list of favorite songs
-  if (GPIO__get_level(1, 19) && cursor_menu == 3) {
-    vTaskSuspend(volume_up_handle);
-    vTaskSuspend(volume_down_handle);
-    white_Out(0, OLED_ALL_PAGES);
-    read_favorite();
-    display_favorite();
-    menu_switch = false;
-  }
-  if (GPIO__get_level(1, 19) && cursor_menu == 4) {
-    vTaskSuspend(volume_up_handle);
-    vTaskSuspend(volume_down_handle);
-    white_Out(0, OLED_ALL_PAGES);
-    display("Clearing favorite");
-    clear_favorite();
-    read_favorite();
-    menu_switch = false;
-  }
-  cursor_menu++;
-}
-// FIXME
 
 void read_favorite() {
-  fprintf(stderr, "checking read\n");
   UINT br; // binary
   const char *filename = "favorite.txt";
   FIL file; // create object file
-  FRESULT result = f_open(&file, filename, (FA_OPEN_EXISTING | FA_READ));
-  char index[128] = {0};
+  FRESULT result = f_open(&file, filename, (FA_OPEN_EXISTING | FA_READ | FA_WRITE));
+  char index[8] = {0};
+
   if (FR_OK == result) {
     f_read(&file, index, sizeof(index), &br);
     while (br != 0) {
@@ -556,56 +652,26 @@ void read_favorite() {
   } else {
     fprintf(stderr, "failed at read_favor");
   }
-  fprintf(stderr, "data: %c\n", index[0]);
   char *token;
   int index_of_favorite_song = 0;
   favorite_counter_token = 0;
   token = strtok(index, " ");
   while (token != NULL) {
     favorite[index_of_favorite_song] = atoi(token);
-    fprintf(stderr, "%d: ", favorite[index_of_favorite_song]);
     token = strtok(NULL, " ");
     index_of_favorite_song++;
     favorite_counter_token++;
   }
 }
 
-void favorite_song_sender_task() {
-  uint16_t data;
-  while (1) {
-    if (xSemaphoreTake(favorite_song_sender, portMAX_DELAY)) {
-      data = cursor_main - 1;
-      xQueueSend(Q_song_favorite, &data, 0);
-    }
-  }
-}
-
-void favorite_songs_list() {
-  char string[8];
-  uint16_t index_song;
-  const char *filename = "favorite.txt";
-  FIL file; // File handle
-  UINT bytes_written = 0;
-  FRESULT result = f_open(&file, filename, (FA_OPEN_APPEND | FA_WRITE));
-  while (1) {
-    if (xQueueReceive(Q_song_favorite, &index_song, portMAX_DELAY)) {
-      if (FR_OK == result) {
-        sprintf(string, "%d ", index_song);
-        if (FR_OK == f_write(&file, string, strlen(string), &bytes_written)) {
-        } else {
-          fprintf(stderr, "ERROR: Failed to write data to file\n");
-        }
-        f_sync(&file);
-      } else {
-        fprintf(stderr, "ERROR: Failed to open: %s\n", filename);
-      }
-    }
-    // f_close(&file);
-  }
-}
 void play_list_navigation() {
   if (cursor_main == total_of_songs()) {
     clear_cursor_and_screen();
+  }
+  if (cursor_for_scrolling != 0) {
+    deactivate_horizontal_scrolling();
+    white_Out(cursor_for_scrolling - 1, OLED_SINGLE_PAGE);
+    display_at_page(list_song_without_mp3[cursor_main - 1], cursor_for_scrolling - 1);
   }
   horizontal_scrolling(cursor_for_scrolling);
   if (GPIO__get_level(1, 19)) {
@@ -630,6 +696,9 @@ void play_list_navigation() {
   }
 }
 
+/**
+ * Thank you Bang for this funtion
+ */
 void debounce_reduce(uint8_t port, uint8_t pin) {
   uint8_t delay = 0;
   while (GPIO__get_level(port, pin)) {
@@ -649,12 +718,12 @@ void loading_screen() {
   delay__ms(1000);
   white_Out(0, OLED_ALL_PAGES);
 }
-
+// TODO
 void display_favorite() {
   uint8_t oled_page_counter = 0;
   for (int i = 0; i < favorite_counter_token; i++) {
     char *song = list_song_without_mp3[favorite[i]];
-    fprintf(stderr, "\n%s\n", song);
+    // fprintf(stderr, "\n%s\n", song);
     display_at_page(song, oled_page_counter);
     oled_page_counter++;
   }
@@ -663,9 +732,9 @@ void display_favorite() {
 void clear_favorite() {
   const char *filename = "favorite.txt";
   FIL file; // create object file
-  FRESULT result = f_open(&file, filename, FA_CREATE_ALWAYS);
+  f_open(&file, filename, FA_CREATE_ALWAYS | FA_WRITE | FA_READ);
   f_close(&file);
-  memset(favorite, 0, sizeof(favorite));
+  is_clear = true;
 }
 
 /* -------------------------------------------------------------------------- */
